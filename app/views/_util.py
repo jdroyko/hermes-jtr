@@ -23,7 +23,13 @@ def is_own(doc):
     return doc["traveler_id"] == me()
 
 
+def is_plan_author(doc):
+    return bool(doc["is_template"]) and doc["created_by"] == me() and rbac.has_perm(me(), "plan.assign")
+
+
 def can_view(doc):
+    if is_plan_author(doc):
+        return True
     if is_own(doc) and rbac.has_perm(me(), "document.view.self"):
         return True
     if rbac.has_perm(me(), "document.view.org", doc["org_id"]):
@@ -37,19 +43,21 @@ def can_view(doc):
 def can_edit(doc):
     if doc["status"] not in workflow.EDITABLE:
         return False
+    if doc["is_template"]:
+        return is_plan_author(doc)
     return (is_own(doc) and rbac.has_perm(me(), "document.edit.self")) or \
         rbac.has_perm(me(), "document.edit.others", doc["org_id"])
 
 
 def can_sign(doc):
-    if doc["status"] not in workflow.EDITABLE:
+    if doc["is_template"] or doc["status"] not in workflow.EDITABLE:
         return False
     return (is_own(doc) and rbac.has_perm(me(), "document.sign.self")) or \
         (not is_own(doc) and rbac.has_perm(me(), "document.sign.others", doc["org_id"]))
 
 
 def can_cancel(doc):
-    if doc["status"] in workflow.FINAL:
+    if doc["is_template"] or doc["status"] in workflow.FINAL:
         return False
     return rbac.has_perm(me(), "document.cancel", doc["org_id"] if not is_own(doc) else None) and \
         (is_own(doc) or rbac.has_perm(me(), "document.edit.others", doc["org_id"]))
@@ -64,7 +72,8 @@ def can_amend(doc):
 def load_children(doc_id):
     db = get_db()
     stops = [dict(r) for r in db.execute(
-        "SELECT s.*, r.location, r.state, r.status AS rate_status FROM document_stops s "
+        "SELECT s.*, COALESCE(s.location_text, r.location) AS location, COALESCE(s.location_state, r.state) AS state, "
+        "r.location AS rate_location, r.state AS rate_state, r.status AS rate_status FROM document_stops s "
         "JOIN per_diem_rates r ON r.id=s.rate_id WHERE s.document_id=? ORDER BY s.sort_order", (doc_id,))]
     for s in stops:
         s["nights"] = (dt.date.fromisoformat(s["depart_date"]) - dt.date.fromisoformat(s["arrive_date"])).days

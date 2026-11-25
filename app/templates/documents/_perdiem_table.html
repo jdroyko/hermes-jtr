@@ -1,4 +1,35 @@
 {% if per_diem.lines %}
+{% call m.table_wrap('Per diem summary') %}
+<table class="table table-compact">
+  <caption>Per diem summary. Each location shows its rates for one full day, then its dates and the amounts allowed. First and last travel days are paid at a reduced M&amp;IE rate.</caption>
+  <thead><tr>
+    <th scope="col">M&amp;IE location</th><th scope="col" class="num">Lodging max</th><th scope="col" class="num">Lodging allowed</th>
+    <th scope="col" class="num">M&amp;IE rate</th><th scope="col" class="num">M&amp;IE allowed</th>
+  </tr></thead>
+  <tbody>
+  {% for g in per_diem.summary %}
+  <tr>
+    <th scope="row">{{ g.location }}<span class="muted">, one day</span></th>
+    <td class="num">{{ g.lodging_max|money }}</td><td class="num">{{ g.lodging_day|money }}</td>
+    <td class="num">{{ g.mie_rate|money }}</td><td class="num">{{ g.mie_day|money }}</td>
+  </tr>
+  <tr class="row-subtotal">
+    <th scope="row">{{ g.start|datefmt }} to {{ g.end|datefmt }}, {{ g.days }} day{{ '' if g.days == 1 else 's' }}</th>
+    <td class="num"><span class="sr-only">Not applicable</span></td><td class="num">{{ g.lodging|money }}</td>
+    <td class="num"><span class="sr-only">Not applicable</span></td><td class="num">{{ g.mie|money }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr>
+    <th scope="row">Per diem total, {{ per_diem.lines|length }} day{{ '' if per_diem.lines|length == 1 else 's' }}: {{ per_diem.total|money }}</th>
+    <td class="num"><span class="sr-only">Not applicable</span></td><td class="num">{{ per_diem.lodging|money }}</td>
+    <td class="num"><span class="sr-only">Not applicable</span></td><td class="num">{{ per_diem.mie|money }}</td>
+  </tr></tfoot>
+</table>
+{% endcall %}
+
+<details class="perdiem-days">
+  <summary>Per diem by day ({{ per_diem.lines|length }} day{{ '' if per_diem.lines|length == 1 else 's' }})</summary>
 {% call m.table_wrap('Per diem by day') %}
 <table class="table table-compact">
   <caption>Per diem by day. First and last travel days are paid at a reduced M&amp;IE rate.</caption>
@@ -26,6 +57,7 @@
   </tr></tfoot>
 </table>
 {% endcall %}
+</details>
 {% else %}
 <p>No per diem is computed yet.</p>
 {% endif %}

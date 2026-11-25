@@ -1,0 +1,59 @@
+{% extends "planner/_layout.html" %}
+{% block title %}Plan a trip: Driving your own vehicle{% endblock %}
+{% import "_travel.html" as tv with context %}
+{% block screen %}
+<h1>Driving your own vehicle</h1>
+<p>Using a personal vehicle needs a cost comparison with flying. Enter where you start and where you are going, and we estimate the mileage, your reimbursement and the gas cost.</p>
+{{ m.error_summary(errors) }}
+<form method="post" novalidate class="planner-card">
+  {{ m.csrf() }}
+  <div class="grid-2">
+    {{ m.input('start', 'Starting city or address', values.start, errors, required=True, hint='For example, your home or duty station: Dayton, OH.') }}
+    {{ m.input('destination', 'Destination city or address', values.destination, errors, required=True) }}
+  </div>
+  <div class="grid-2">
+    {{ m.input('mpg', 'Your vehicle\'s miles per gallon', values.mpg, errors, width='sm', attrs='inputmode="numeric"', hint='Used for the gas estimate only.') }}
+    {{ m.input('miles', 'One-way miles', values.miles, errors, width='sm', attrs='inputmode="decimal"', hint='Enter map or odometer miles to replace our estimate.') }}
+  </div>
+  <div class="button-row">
+    <button type="submit" name="action" value="calculate" class="btn btn-secondary btn-large">Calculate</button>
+    {% if result %}<button type="submit" name="action" value="save" class="btn btn-primary btn-large">Save and continue</button>{% endif %}
+  </div>
+</form>
+
+{% if result %}
+<section aria-labelledby="cmp-title" class="card" aria-live="polite">
+  <h2 id="cmp-title">Driving compared with flying</h2>
+  <dl class="summary-list">
+    <div><dt>Distance</dt><dd>{{ '{:,.0f}'.format(result.one_way) }} miles each way, {{ '{:,.0f}'.format(result.round_trip) }} miles round trip
+      <span class="muted">({{ {'entered': 'miles you entered', 'city': 'estimated between the two cities', 'state': 'rough estimate from the state center; enter your own miles for accuracy'}[result.method] }})</span></dd></div>
+    <div><dt>Mileage reimbursement</dt><dd><strong>{{ result.reimbursement|money }}</strong> <span class="muted">({{ '{:,.0f}'.format(result.round_trip) }} miles at {{ '$%.3f'|format(result.rate) }} a mile)</span></dd></div>
+    <div><dt>Estimated gas cost</dt><dd>{{ result.gas_cost|money }} <span class="muted">(at {{ result.gas_price|money }} a gallon, the sample average near {{ result.destination }}, and {{ '%g'|format(result.mpg) }} miles per gallon)</span></dd></div>
+    <div><dt>Flying instead</dt><dd>{% if result.airfare %}From {{ result.airfare|money }} round trip, {{ result.origin_airport }} to {{ result.dest_airport }}{% else %}No nearby airports to compare{% endif %}</dd></div>
+  </dl>
+  {% if result.flights %}
+  <h3>Three lowest in-policy flights</h3>
+  <ul class="result-list">
+    {% for o in result.flights %}
+    <li class="result-card">
+      <div class="result-main">
+        <h4 class="h3">{{ o.title }}</h4>
+        {{ tv.vendor_head(o) }}
+        <ul class="result-details">{% for d in o.details %}<li>{{ d }}</li>{% endfor %}</ul>
+      </div>
+      <div class="result-price"><p><strong class="price">{{ o.total|money }}</strong><br><span class="muted">round trip</span></p></div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% if result.airfare %}
+    {% if result.reimbursement > result.airfare %}
+    <div class="alert alert-info" role="note"><span class="alert-label">Note:</span> Driving costs the government {{ (result.reimbursement - result.airfare)|money }} more than flying. If you drive for personal preference, your reimbursement may be limited to the cost of flying under the JTR.</div>
+    {% else %}
+    <p><span class="tag tag-approved">Driving costs less</span> Driving saves {{ (result.airfare - result.reimbursement)|money }} compared with flying.</p>
+    {% endif %}
+  {% endif %}
+</section>
+{% endif %}
+<p><a href="{{ url_for('planner.how', doc_id=doc.id) }}">Back to how you want to get there</a></p>
+{% endblock %}

@@ -45,8 +45,8 @@
         var input = btn.parentElement.querySelector("[data-password-input]");
         var shown = input.type === "text";
         input.type = shown ? "password" : "text";
+        // Label stays "Show password"; aria-pressed announces the state.
         btn.setAttribute("aria-pressed", String(!shown));
-        btn.innerHTML = (shown ? "Show" : "Hide") + ' <span class="sr-only">password</span>';
         input.focus();
       });
     });

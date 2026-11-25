@@ -1,0 +1,32 @@
+{% extends "planner/_layout.html" %}
+{% block title %}Plan a trip: Where will you stay?{% endblock %}
+{% import "_travel.html" as tv with context %}
+{% block screen %}
+<h1>Where will you stay?</h1>
+<p>Hotels near {{ stop.location }}, {{ stop.state }}, {{ stop.arrive_date|datefmt }} to {{ stop.depart_date|datefmt }}, at or below the lodging maximum of <strong>{{ lodging_max|money }}</strong> a night.</p>
+<form method="post" class="button-row">
+  {{ m.csrf() }}
+  <button type="submit" name="action" value="gov_quarters" class="btn btn-secondary">I'll stay in government quarters</button>
+  <button type="submit" name="action" value="skip" class="btn btn-secondary">Skip for now</button>
+</form>
+{% if hotels %}
+<ul class="result-list">
+  {% for o in hotels %}
+  <li class="result-card">
+    <div class="result-main">
+      <h2 class="h3">{{ o.title }}</h2>
+      {{ tv.vendor_head(o) }}
+      <ul class="result-details">{% for d in o.details %}<li>{{ d }}</li>{% endfor %}</ul>
+      <p class="result-tags"><span class="tag tag-approved">In policy</span>{% for b in o.badges %} <span class="tag tag-routing">{{ b }}</span>{% endfor %}</p>
+    </div>
+    <div class="result-price">
+      <p><strong class="price">{{ o.unit_price|money }}</strong> a night<br><span class="muted">{{ o.total|money }} for {{ o.units }} night{{ '' if o.units == 1 else 's' }}</span></p>
+      <form method="post">{{ m.csrf() }}<input type="hidden" name="option_id" value="{{ o.id }}">
+        <button type="submit" class="btn btn-primary">Choose<span class="sr-only"> {{ o.title }}</span></button></form>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}<p>No overnight stay on this trip.</p>{% endif %}
+<p><a href="{{ url_for('planner.how', doc_id=doc.id) }}">Back to how you want to get there</a></p>
+{% endblock %}

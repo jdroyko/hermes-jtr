@@ -1,0 +1,19 @@
+{% if selections %}
+{% call m.table_wrap(sel_heading) %}
+<table class="table table-compact">
+  <caption class="sr-only">{{ sel_heading }}</caption>
+  <thead><tr><th scope="col">Type</th><th scope="col">Selection</th><th scope="col">Dates</th><th scope="col">Policy</th><th scope="col" class="num">Estimated cost</th></tr></thead>
+  <tbody>
+  {% for s in selections %}
+  <tr>
+    <td>{{ TRAVEL_KINDS[s.kind] }}</td>
+    <th scope="row">{{ s.title }}<br><span class="muted">{{ s.details }}</span></th>
+    <td>{{ s.start_date|datefmt }}{% if s.end_date and s.end_date != s.start_date %} to {{ s.end_date|datefmt }}{% endif %}</td>
+    <td>{% if s.in_policy %}<span class="tag tag-approved">In policy</span>{% else %}<span class="tag tag-returned">Out of policy</span><br>{{ s.policy_reason }}<br><strong>Justification:</strong> {{ s.justification }}{% endif %}</td>
+    <td class="num">{{ s.amount|money }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% endif %}

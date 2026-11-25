@@ -6,7 +6,13 @@ import time
 from flask import Flask, abort, g, redirect, render_template, request, session, url_for
 
 from . import db as dbmod
-from . import rbac, workflow, jtr
+from . import inventory, rbac, workflow, jtr
+
+THEMES = {"cirrus": ("Cirrus style (508 accessible)", "Rounded pill buttons and Inter type, with full Section 508 contrast, focus and target sizes."),
+          "modern": ("Modern style (not 508 compliant)", "The Cirrus look as published: light borders, soft focus glow, compact type. Does not meet 508 contrast or focus rules."),
+          "emburse": ("Emburse style", "Side navigation, rounded cards, roomy layout."),
+          "concur": ("Concur style", "Top navigation bar, squared corners, compact layout.")}
+ACCESSIBLE_THEME, MODERN_THEME = "cirrus", "modern"
 
 
 def create_app(test_config=None):
@@ -85,6 +91,16 @@ def create_app(test_config=None):
         return resp
 
     # ------------------------------------------------------------- templates
+    logo_dir = os.path.join(app.static_folder, "img", "logos")
+    logos = {os.path.splitext(f)[0]: f for f in os.listdir(logo_dir)
+             if f.endswith((".svg", ".png"))} if os.path.isdir(logo_dir) else {}
+
+    def my_programs(uid):
+        if not uid:
+            return set()
+        return {r["program"] for r in dbmod.get_db().execute(
+            "SELECT program FROM user_memberships WHERE user_id=?", (uid,))}
+
     @app.context_processor
     def inject():
         uid = g.user["id"] if g.get("user") else None
@@ -93,7 +109,15 @@ def create_app(test_config=None):
             csrf_token=session.get("csrf", ""),
             STATUS_LABELS=workflow.STATUS_LABELS,
             DOC_TYPE_LABELS=workflow.DOC_TYPE_LABELS,
+            doc_label=workflow.doc_label,
+            BOOKING_LABELS=workflow.BOOKING_LABELS,
+            BOOKING_KINDS=workflow.BOOKING_KINDS,
             CATEGORY_LABELS=jtr.CATEGORY_LABELS,
+            TRAVEL_KINDS=inventory.KINDS,
+            THEMES=THEMES,
+            PROGRAMS=inventory.PROGRAMS,
+            LOGOS=logos,
+            my_programs=my_programs(uid),
             org_name=dbmod.setting("org_name", "Travel"),
             session_timeout=dbmod.setting("session_timeout_minutes", 15, int),
             today=dt.date.today().isoformat(),
@@ -127,7 +151,8 @@ def create_app(test_config=None):
                                         "That file is larger than the 10 MB limit. Reduce the file size and "
                                         "try again."))
 
-    from .views import auth, main, documents, admin, reports, attachments
-    for bp in (auth.bp, main.bp, documents.bp, admin.bp, reports.bp, attachments.bp):
+    from .views import auth, main, documents, admin, reports, attachments, plans, agency, travel, planner
+    for bp in (auth.bp, main.bp, documents.bp, admin.bp, reports.bp, attachments.bp, plans.bp, agency.bp,
+               travel.bp, planner.bp):
         app.register_blueprint(bp)
     return app

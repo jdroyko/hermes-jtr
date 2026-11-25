@@ -13,7 +13,7 @@ blocks you, are listed here.</p>
   <tbody>
   {% for d, step, u in rows %}
   <tr>
-    <th scope="row"><a href="{{ url_for('documents.view', doc_id=d.id) }}">{{ d.doc_number }}</a><br><span class="muted">{{ DOC_TYPE_LABELS[d.doc_type] }}</span></th>
+    <th scope="row"><a href="{{ url_for('documents.view', doc_id=d.id) }}">{{ d.doc_number }}</a><br><span class="muted">{{ doc_label(d) }}</span></th>
     <td>{{ u.last_name }}, {{ u.first_name }}</td>
     <td>{{ d.trip_description }}<br><span class="muted">{{ d.start_date|datefmt }} to {{ d.end_date|datefmt }}</span></td>
     <td>{{ step.name }}<br><span class="muted">Stamp: {{ step.stamp }}</span></td>

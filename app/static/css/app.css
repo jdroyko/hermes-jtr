@@ -165,12 +165,16 @@ fieldset.perm-group { border-top: 1px solid var(--line-soft); padding-top: 0.75r
   border: 2px solid var(--line); border-radius: 0; min-height: 2.75rem; }
 textarea.input { min-height: 5rem; }
 .input.w-sm { max-width: 9rem; } .input.w-md { max-width: 20rem; }
-.password-field { display: flex; align-items: stretch; max-width: 20rem; }
-.password-field .input { border-right: 0; }
-.password-field .password-toggle { border: 2px solid var(--line); border-left: 0; background: var(--bg-alt);
-  white-space: nowrap; text-decoration: none; min-width: 4.5rem; }
-.password-field .password-toggle:hover { background: #e8f1fa; }
-.password-field .password-toggle:focus-visible { outline: 3px solid var(--primary); outline-offset: -3px; z-index: 1; }
+/* Show/hide password: eye button sits inside the text box (right edge). */
+.password-field { position: relative; max-width: 20rem; }
+.password-field .input { padding-right: 3rem; max-width: none; }
+.password-field .password-toggle { position: absolute; top: 0; right: 0; bottom: 0; width: 2.75rem; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center; background: none; border: 0;
+  color: var(--ink); cursor: pointer; border-radius: 0; }
+.password-field .password-toggle:hover { color: var(--primary-dark); background: var(--bg-alt); }
+.password-field .password-toggle:focus-visible { outline: 3px solid var(--focus); outline-offset: -4px; box-shadow: none; }
+.password-toggle .icon-eye-off, .password-toggle[aria-pressed="true"] .icon-eye { display: none; }
+.password-toggle[aria-pressed="true"] .icon-eye-off { display: block; }
 .has-error { border-left: 4px solid var(--danger); padding-left: 1rem; }
 .has-error .input, .input[aria-invalid="true"] { border-color: var(--danger); }
 .field-error { color: var(--danger); font-weight: 700; margin: 0 0 0.35rem; }
@@ -216,7 +220,7 @@ fieldset[disabled] .input { background: var(--bg-alt); }
 .tag-created { color: var(--tag-created-fg); background: var(--tag-created-bg); }
 .tag-routing { color: var(--tag-routing-fg); background: var(--tag-routing-bg); }
 .tag-returned { color: var(--tag-returned-fg); background: var(--tag-returned-bg); }
-.tag-approved, .tag-paid { color: var(--tag-approved-fg); background: var(--tag-approved-bg); }
+.tag-approved, .tag-paid, .tag-issued { color: var(--tag-approved-fg); background: var(--tag-approved-bg); }
 .tag-cancelled { color: var(--tag-cancelled-fg); background: var(--tag-cancelled-bg); text-decoration: line-through; }
 
 /* Tables */
@@ -264,6 +268,9 @@ tr.dragging { opacity: 0.5; }
 .tree .depth-4 { margin-left: 6rem; } .tree .depth-5 { margin-left: 7.5rem; } .tree .depth-6 { margin-left: 9rem; }
 
 details summary { cursor: pointer; font-weight: 600; padding: 0.5rem 0; }
+.table .row-subtotal th, .table .row-subtotal td { border-bottom: 2px solid var(--line-soft); font-weight: 600; background: var(--bg-alt); }
+.perdiem-days { margin-top: 0.75rem; }
+.perdiem-days summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
 /* Receipt attachments */
 .attachment-list { list-style: none; padding: 0; margin: 0 0 1rem; }
@@ -328,3 +335,193 @@ dialog h2 { margin-top: 0; }
   .tag { background: none !important; border: 1px solid #000 !important; color: #000 !important; }
   .main-area { background: none; }
 }
+
+/* Travel search results */
+.search-tabs ul { border-bottom: 2px solid var(--line-soft); padding-bottom: 0.25rem; }
+.search-tabs a { display: inline-block; padding: 0.5rem 0.25rem; font-weight: 600; }
+.result-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.result-card { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 1rem; background: var(--surface);
+  border: 1px solid var(--line-soft); border-left: 4px solid var(--success); border-radius: var(--radius-md);
+  padding: 1rem 1.25rem; box-shadow: var(--shadow-sm); }
+.result-card.is-out-of-policy { border-left-color: var(--danger); }
+.result-card h3 { margin: 0 0 0.35rem; font-size: 1.1rem; }
+.result-main { flex: 1 1 22rem; min-width: 0; }
+.result-details { list-style: none; padding: 0; margin: 0 0 0.5rem; color: var(--muted); }
+.result-tags { margin: 0; display: flex; flex-wrap: wrap; gap: 0.35rem 0.5rem; align-items: center; }
+.result-price { flex: 0 0 auto; text-align: right; }
+.result-price .price { font-size: 1.4rem; }
+
+/* Concur-style theme: top navigation bar, squared corners, compact density.
+   Every color pair keeps WCAG AA contrast (white on #0b3a68 is 11:1). */
+.theme-concur {
+  --primary: #0a5ba8; --primary-dark: #0b3a68; --focus: #0b3a68;
+  --radius: 0.125rem; --radius-sm: 0.125rem; --radius-md: 0.25rem; --radius-lg: 0.25rem;
+  --surface-sunken: #f4f6f8;
+  font-family: Arial, Helvetica, sans-serif; font-size: 1rem;
+}
+.theme-concur .topbar { background: #fff; color: var(--ink); border-bottom: 1px solid var(--line-soft); }
+.theme-concur .brand, .theme-concur .brand:visited, .theme-concur .brand:hover { color: var(--primary-dark); }
+.theme-concur .brand-mark { background: var(--primary-dark); color: #fff; }
+.theme-concur .user-menu .btn-link, .theme-concur .sidebar-toggle { color: var(--primary-dark); }
+.theme-concur .topbar :focus-visible { outline-color: var(--focus); }
+.theme-concur .app-shell { flex-direction: column; align-items: stretch; }
+.theme-concur .sidebar { width: 100%; background: #0b3a68; border: 0; padding: 0 1rem; display: flex; flex-wrap: wrap; align-items: stretch; }
+.theme-concur .sidebar ul { display: flex; flex-wrap: wrap; }
+.theme-concur .sidebar a, .theme-concur .sidebar a:visited { color: #fff; border-left: 0; border-bottom: 4px solid transparent; padding: 0.8rem 1rem 0.6rem; }
+.theme-concur .sidebar a:hover { background: rgba(255,255,255,0.12); }
+.theme-concur .sidebar a[aria-current="page"] { background: rgba(255,255,255,0.16); color: #fff; border-bottom-color: #ffbe2e; }
+.theme-concur .sidebar :focus-visible { outline-color: #fff; outline-offset: -4px; box-shadow: none; }
+.theme-concur .sidebar-group { margin: 0 0 0 auto; padding: 0; border: 0; display: flex; align-items: center; }
+.theme-concur .sidebar-group-title { display: none; }
+.theme-concur .card { border-left-width: 1px; border-top: 3px solid var(--primary); box-shadow: none; }
+.theme-concur .card-warn { border-top-color: var(--warn-line); }
+.theme-concur .result-card { border-left-width: 1px; border-top: 3px solid var(--success); }
+.theme-concur .result-card.is-out-of-policy { border-top-color: var(--danger); }
+.theme-concur .btn { font-weight: 600; }
+.theme-concur h1 { font-size: 1.75rem; }
+@media (max-width: 40rem) {
+  .theme-concur .sidebar { padding: 0; }
+  .theme-concur .sidebar ul { flex-direction: column; width: 100%; }
+  .theme-concur .sidebar-group { margin: 0; width: 100%; }
+  .theme-concur .sidebar a { border-bottom: 0; border-left: 4px solid transparent; }
+  .theme-concur .sidebar a[aria-current="page"] { border-left-color: #ffbe2e; }
+}
+@media (forced-colors: active) {
+  .theme-concur .sidebar a[aria-current="page"] { background: Highlight; color: HighlightText; }
+}
+
+/* Cirrus-style theme: Inter type, ink pill buttons with soft layered shadows.
+   Adapted from the Cirrus button for Section 508 / WCAG 2.1 AA:
+   - Cirrus removes the outline and relies on a 32%-alpha blue glow (~1.6:1);
+     here the solid 3px focus outline is kept (#1a56db is 6.2:1 on white).
+   - Sizes are in rem (15px -> 0.9375rem, 48px -> 3rem) so text zoom works.
+   - White on ink #0e1116 is 19:1; hover #1a1f28 is 17:1.
+   - Secondary buttons get a #757575 border (4.6:1) so the control edge is visible.
+   - Motion is disabled by the global prefers-reduced-motion rule. */
+.theme-cirrus {
+  --ink: #0e1116; --cirrus-ink-hover: #1a1f28;
+  --primary: #1a56db; --primary-dark: #1442a8; --focus: #1a56db;
+  --cirrus-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --cirrus-shadow: 0 1px 1px rgba(14,17,22,0.06), 0 14px 28px -18px rgba(14,17,22,0.4);
+  --cirrus-shadow-hover: 0 1px 1px rgba(14,17,22,0.08), 0 20px 36px -16px rgba(14,17,22,0.48);
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 1rem; letter-spacing: -0.005em;
+}
+.theme-cirrus h1, .theme-cirrus h2, .theme-cirrus h3 { font-weight: 600; letter-spacing: -0.015em; }
+.theme-cirrus .btn {
+  gap: 0.625rem; min-height: 3rem; padding: 0 1.5rem; border-radius: 999px;
+  font-size: 0.9375rem; font-weight: 500; line-height: 1;
+  transition: transform 140ms var(--cirrus-ease), background-color 220ms var(--cirrus-ease),
+    box-shadow 220ms var(--cirrus-ease), border-color 220ms var(--cirrus-ease);
+}
+.theme-cirrus .btn:active { transform: translateY(1px); }
+.theme-cirrus .btn-primary { background: var(--ink); color: #fff; box-shadow: var(--cirrus-shadow); }
+.theme-cirrus .btn-primary:hover { background: var(--cirrus-ink-hover); color: #fff; box-shadow: var(--cirrus-shadow-hover); }
+.theme-cirrus .btn-secondary { background: #fff; color: var(--ink); border-color: var(--line); box-shadow: var(--cirrus-shadow); }
+.theme-cirrus .btn-secondary:visited { color: var(--ink); }
+.theme-cirrus .btn-secondary:hover { background: #f1f2f4; border-color: var(--ink); box-shadow: var(--cirrus-shadow-hover); }
+.theme-cirrus .btn-danger { box-shadow: var(--cirrus-shadow); }
+.theme-cirrus .btn-danger:hover { box-shadow: var(--cirrus-shadow-hover); }
+.theme-cirrus .btn-small { min-height: 2.25rem; padding: 0 1rem; font-size: 0.875rem; }
+.theme-cirrus .btn-large { min-height: 3.25rem; padding: 0 1.75rem; font-size: 1.05rem; }
+.theme-cirrus .btn-link { min-height: 2.75rem; padding: 0.25rem 0.5rem; box-shadow: none; }
+.theme-cirrus .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px;
+  box-shadow: 0 0 0 2px #fff, var(--cirrus-shadow); }
+.theme-cirrus .btn-link:focus-visible { box-shadow: none; }
+.theme-cirrus .topbar .btn:focus-visible { outline-color: #fff; box-shadow: none; }
+.theme-cirrus .brand-mark { border-radius: 999px; padding: 0.15rem 0.6rem; }
+
+/* Simple trip planner: one question per screen */
+.planner { max-width: 48rem; margin: 0 auto; }
+.planner h1 { font-size: 2.1rem; margin-top: 0.5rem; }
+.planner-progress { margin: 0.5rem 0 0.35rem; font-weight: 600; color: var(--muted); }
+.planner-bar { height: 0.5rem; background: var(--line-soft); border-radius: 999px; overflow: hidden; }
+.planner-bar-fill { display: block; height: 100%; background: var(--primary); }
+.fill-1 { width: 16.6%; } .fill-2 { width: 33.3%; } .fill-3 { width: 50%; }
+.fill-4 { width: 66.6%; } .fill-5 { width: 83.3%; } .fill-6 { width: 100%; }
+.planner-card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-lg);
+  padding: 1.5rem; box-shadow: var(--shadow-md); margin: 1rem 0 1.5rem; }
+.planner-card .field { max-width: none; }
+.btn-large { padding: 0.8rem 1.75rem; font-size: 1.1rem; min-height: 3.25rem; }
+.h3 { font-size: 1.2rem; margin: 0 0 0.35rem; }
+.grid-3 { display: grid; gap: 0 1rem; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); }
+.flight-leg { border-top: 1px solid var(--line-soft); padding-top: 0.75rem; margin-bottom: 0.5rem; }
+.flight-leg:first-of-type { border-top: 0; padding-top: 0; }
+.flight-leg legend { font-size: 1.05rem; }
+.choice-tiles { display: grid; gap: 0.75rem; }
+.choice-tile { position: relative; }
+.choice-tile input { position: absolute; left: 1.1rem; top: 1.35rem; width: 1.4rem; height: 1.4rem; margin: 0; accent-color: var(--primary); }
+.choice-tile label { display: block; padding: 1rem 1rem 1rem 3.25rem; border: 2px solid var(--line); border-radius: var(--radius-md);
+  background: var(--surface); cursor: pointer; font-size: 1.15rem; }
+.choice-tile label .hint { display: block; margin: 0.2rem 0 0; font-size: 0.95rem; }
+.choice-tile input:checked + label { border-color: var(--primary); background: var(--info-bg); box-shadow: inset 0 0 0 1px var(--primary); }
+.choice-tile input:focus-visible + label { outline: 3px solid var(--focus); outline-offset: 2px; }
+@media (forced-colors: active) { .choice-tile input:checked + label { border: 4px solid Highlight; } }
+
+/* Vendor logo tile, name and loyalty member badge on search results.
+   Logos live in static/img/logos/ named by airline code or loyalty
+   program key (aa.png, hilton.png); vendors without one get a monogram tile. All tones keep white text >= 4.5:1. */
+.vendor-head { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin: 0 0 0.5rem; }
+.vendor { display: inline-flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.vendor-logo { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem;
+  border-radius: var(--radius-sm); font-weight: 700; font-size: 0.85rem; color: #fff; letter-spacing: 0.02em; flex: none; }
+img.vendor-logo { width: 6.5rem; height: 2.25rem; background: transparent; object-fit: contain; object-position: left center; }
+.vendor-tone-0 { background: #1a4480; } .vendor-tone-1 { background: #8b0a03; } .vendor-tone-2 { background: #005ea2; }
+.vendor-tone-3 { background: #00692f; } .vendor-tone-4 { background: #54278f; } .vendor-tone-5 { background: #3d4551; }
+.vendor-name { font-weight: 600; }
+.member-badge { display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.85rem; font-weight: 700;
+  color: #6b4500; background: #fff4d6; border: 1px solid #b07d00; border-radius: 999px; padding: 0.1rem 0.6rem; }
+.membership-list { list-style: none; padding: 0; }
+.membership-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; padding: 0.4rem 0;
+  border-bottom: 1px solid var(--line-soft); }
+@media (forced-colors: active) { .vendor-logo, .member-badge { border: 1px solid CanvasText; } }
+
+/* Sortable column headings (links, so they work with keyboard and without JS) */
+.sort-link { color: inherit; text-decoration: none; display: inline-flex; gap: 0.35rem; align-items: center; font-weight: 700; }
+.sort-link:hover { text-decoration: underline; }
+.sort-arrow { font-size: 0.8em; color: var(--muted); }
+th[aria-sort] .sort-arrow { color: var(--ink); }
+
+/* Header switch: 508 accessible design on/off */
+.design-toggle { background: transparent; color: #fff; border-color: #fff; gap: 0.5rem; white-space: nowrap; }
+.design-toggle:hover { background: rgba(255,255,255,0.14); }
+.design-toggle-track { width: 2rem; height: 1.1rem; border-radius: 999px; border: 2px solid currentColor; position: relative; flex: none; }
+.design-toggle-knob { position: absolute; top: 1px; left: 1px; width: 0.65rem; height: 0.65rem; border-radius: 50%; background: currentColor; }
+.design-toggle[aria-pressed="true"] .design-toggle-knob { left: auto; right: 1px; }
+.theme-concur .design-toggle { color: var(--primary-dark); border-color: var(--primary-dark); }
+.theme-concur .design-toggle:hover { background: var(--bg-alt); }
+
+/* Modern theme: the Cirrus look as published (NOT Section 508 compliant, by design).
+   Known gaps: focus is a faint glow instead of a solid outline, borders and muted
+   text are low contrast, controls use pixel sizes and small 15px type. Users opt in
+   with the header switch and can return to the accessible design at any time. */
+.theme-modern {
+  --ink: #0e1116; --muted: #8b93a1; --line: #e3e6ea; --line-soft: #eef0f3;
+  --primary: #2e7def; --primary-dark: #1f63c6; --focus: rgba(46,125,239,0.32);
+  --surface-sunken: #f7f8fa; --radius-md: 14px; --radius-lg: 20px;
+  font-family: "Inter", system-ui, -apple-system, sans-serif; font-size: 15px; letter-spacing: -0.005em;
+}
+.theme-modern h1, .theme-modern h2, .theme-modern h3 { font-weight: 600; letter-spacing: -0.02em; }
+.theme-modern :focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(46,125,239,0.32); }
+.theme-modern .btn { height: 48px; min-height: 0; padding: 0 24px; border: 0; border-radius: 999px; gap: 10px;
+  font-size: 15px; font-weight: 500; line-height: 1; letter-spacing: -0.005em;
+  transition: transform 140ms cubic-bezier(0.22,1,0.36,1), background-color 220ms cubic-bezier(0.22,1,0.36,1), box-shadow 220ms cubic-bezier(0.22,1,0.36,1); }
+.theme-modern .btn:active { transform: translateY(1px); }
+.theme-modern .btn-primary, .theme-modern .btn-danger { box-shadow: 0 1px 1px rgba(14,17,22,0.06), 0 14px 28px -18px rgba(14,17,22,0.4); }
+.theme-modern .btn-primary { background: #0e1116; color: #fff; }
+.theme-modern .btn-primary:hover { background: #1a1f28; box-shadow: 0 1px 1px rgba(14,17,22,0.08), 0 20px 36px -16px rgba(14,17,22,0.48); }
+.theme-modern .btn-secondary { background: #fff; color: #0e1116; border: 1px solid #e3e6ea; box-shadow: 0 1px 2px rgba(14,17,22,0.06); }
+.theme-modern .btn-secondary:hover { background: #f4f5f7; }
+.theme-modern .btn-small { height: 36px; padding: 0 16px; font-size: 13px; }
+.theme-modern .btn-large { height: 52px; padding: 0 28px; font-size: 16px; }
+.theme-modern .btn-link { height: auto; padding: 4px 8px; background: none; color: var(--primary); }
+.theme-modern .input { border: 1px solid #e3e6ea; border-radius: 12px; min-height: 44px; }
+.theme-modern .input:focus { border-color: #2e7def; box-shadow: 0 0 0 3px rgba(46,125,239,0.2); outline: none; }
+.theme-modern .card, .theme-modern .planner-card { border: 1px solid #eef0f3; border-radius: 20px; box-shadow: 0 1px 2px rgba(14,17,22,0.04), 0 12px 32px -20px rgba(14,17,22,0.2); }
+.theme-modern .topbar { background: #0e1116; }
+.theme-modern .brand-mark { border-radius: 999px; padding: 2px 10px; }
+.theme-modern .sidebar a { border-radius: 999px; margin: 2px 12px; padding: 10px 14px; border-left: 0; }
+.theme-modern .sidebar a[aria-current="page"] { background: #0e1116; color: #fff; }
+.theme-modern .table th, .theme-modern .table td { border-color: #eef0f3; }
+.theme-modern .design-toggle { height: 36px; border: 1px solid rgba(255,255,255,0.4); }
+.theme-modern .design-toggle:focus-visible { box-shadow: 0 0 0 3px rgba(46,125,239,0.5); }

@@ -115,7 +115,9 @@ def check(html, url):
 PAGES = {
     None: ["/login", "/accessibility"],
     "traveler": ["/", "/profile", "/documents/", "/documents/queue", "/documents/board", "/documents/new?type=AUTH",
-                 "/documents/new?type=LOCAL"],
+                 "/documents/new?type=LOCAL", "/documents/new?type=PLAN"],
+    "ao": ["/plans/", "/plans/new"],
+    "agent": ["/agency/"],
     "admin": ["/admin/", "/admin/users", "/admin/users/new", "/admin/users/2", "/admin/users/2/profile",
               "/admin/roles", "/admin/roles/new", "/admin/roles/1", "/admin/roles/new?clone=1", "/admin/matrix",
               "/admin/permissions", "/admin/sod", "/admin/policy", "/admin/routing", "/admin/routing/1",
@@ -181,6 +183,48 @@ def test_board_a11y_with_cards(as_user):
     check(resp.get_data(as_text=True), "/documents/board (returned card, signable)")
 
 
+def test_plan_and_agency_pages_a11y(app, as_user):
+    import datetime as dt
+    from app.db import get_db
+    s = (dt.date.today() + dt.timedelta(days=7)).isoformat()
+    e = (dt.date.today() + dt.timedelta(days=9)).isoformat()
+    ao = as_user("ao")
+    r = ao.post("/plans/new", data={"trip_purpose": "TDY", "trip_description": "Group a11y", "start_date": s,
+                                    "end_date": e})
+    plan = int(re.search(r"/documents/(\d+)/", r.headers["Location"]).group(1))
+    ao.post("/documents/%d/itinerary" % plan,
+            data={"action": "add", "location_text": "Standard CONUS, US", "arrive_date": s, "depart_date": e})
+    for url in ("/documents/%d/itinerary" % plan, "/plans/%d" % plan):
+        resp = ao.get(url)
+        assert resp.status_code == 200
+        check(resp.get_data(as_text=True), url)
+    resp = ao.post("/plans/%d" % plan, data={"action": "issue"})
+    check(resp.get_data(as_text=True), "/plans/%d (errors)" % plan)
+
+    t = as_user("traveler")
+    r = t.post("/documents/new", data={"type": "PLAN", "traveler_id": "2", "trip_purpose": "TDY",
+                                       "trip_description": "Plan a11y", "start_date": s, "end_date": e,
+                                       "loa_id": "2"})
+    doc = int(re.search(r"/documents/(\d+)/", r.headers["Location"]).group(1))
+    t.post("/documents/%d/itinerary" % doc,
+           data={"action": "add", "location_text": "Standard CONUS, US", "arrive_date": s, "depart_date": e})
+    t.post("/documents/%d/sign" % doc, data={"certify": "1"})
+    as_user("budget").post("/documents/%d/action" % doc, data={"action": "stamp"})
+    ao.post("/documents/%d/action" % doc, data={"action": "stamp"})
+    with app.app_context():
+        booking = get_db().execute("SELECT id FROM bookings WHERE document_id=?", (doc,)).fetchone()["id"]
+    agent = as_user("agent")
+    agent.post("/agency/%d" % booking, data={"action": "add_item", "kind": "LODGING", "vendor": "Inn",
+                                              "confirmation": "H1", "amount": "300"})
+    for c, url in ((agent, "/agency/"), (agent, "/agency/%d" % booking), (t, "/documents/%d" % doc)):
+        resp = c.get(url)
+        assert resp.status_code == 200
+        check(resp.get_data(as_text=True), url)
+    ao.post("/plans/%d" % plan, data={"action": "issue", "traveler_id": ["2"]})
+    resp = ao.get("/plans/%d" % plan)
+    check(resp.get_data(as_text=True), "/plans/%d (issued)" % plan)
+
+
 def test_error_states_a11y(client, as_user):
     r = client.post("/login", data={"username": "", "password": ""})
     html = r.get_data(as_text=True)
@@ -192,3 +236,34 @@ def test_error_states_a11y(client, as_user):
     html = r.get_data(as_text=True)
     assert html.count('aria-invalid="true"') >= 3
     check(html, "/documents/new (errors)")
+
+
+def test_travel_search_pages_a11y(app, as_user):
+    import datetime as dt
+    from app import inventory
+    s = (dt.date.today() + dt.timedelta(days=7)).isoformat()
+    e = (dt.date.today() + dt.timedelta(days=9)).isoformat()
+    t = as_user("traveler")
+    r = t.post("/documents/new", data={"type": "PLAN", "traveler_id": "2", "trip_purpose": "TDY",
+                                       "trip_description": "Travel a11y", "start_date": s, "end_date": e})
+    doc = int(re.search(r"/documents/(\d+)/", r.headers["Location"]).group(1))
+    check(t.get("/documents/%d/travel" % doc).get_data(as_text=True), "travel (no stops)")
+    t.post("/documents/%d/itinerary" % doc,
+           data={"action": "add", "location_text": "San Diego, CA", "arrive_date": s, "depart_date": e})
+    for q in ("kind=AIR", "kind=AIR&searched=1&origin=Dayton%2C+OH", "kind=AIR&searched=1&origin=",
+              "kind=LODGING", "kind=RENTAL_CAR&in_policy_only=1"):
+        resp = t.get("/documents/%d/travel?%s" % (doc, q))
+        assert resp.status_code == 200, q
+        check(resp.get_data(as_text=True), q)
+    car = next(o for o in inventory.cars("San Diego, CA", s, e, 215) if not o["in_policy"])
+    resp = t.post("/documents/%d/travel" % doc, data={"action": "select", "kind": "RENTAL_CAR",
+                                                      "option_id": car["id"], "confirming": "1"})
+    check(resp.get_data(as_text=True), "travel justify (error)")
+    t.post("/documents/%d/travel" % doc, data={"action": "select", "kind": "RENTAL_CAR", "option_id": car["id"],
+                                               "justification": "Equipment"})
+    for theme in ("concur", "cirrus"):
+        t.post("/profile/theme", data={"theme": theme})
+        for url in ("/documents/%d/travel?kind=RENTAL_CAR" % doc, "/documents/%d" % doc, "/profile", "/"):
+            resp = t.get(url)
+            assert resp.status_code == 200
+            check(resp.get_data(as_text=True), "%s (%s)" % (url, theme))

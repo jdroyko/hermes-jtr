@@ -45,6 +45,7 @@ PERMISSIONS = {
     "document.sign.others":   ("Documents", "Sign on behalf (NDEA)", "Sign documents for travelers without DTS access (Non-DTS Entry Agent)."),
     "document.cancel":        ("Documents", "Cancel documents", "Cancel a document that has not been paid."),
     "document.amend":         ("Documents", "Amend authorizations", "Amend an approved authorization (creates an amendment)."),
+    "plan.assign":            ("Documents", "Assign travel plans", "Build a group travel plan and issue it as authorizations to travelers in scope."),
     # Workflow ---------------------------------------------------------------
     "workflow.review":        ("Workflow", "Review", "Apply the REVIEWED stamp on routing steps that require it."),
     "workflow.approve":       ("Workflow", "Approve (AO)", "Apply the APPROVED stamp as Authorizing / Approving Official."),
@@ -52,6 +53,9 @@ PERMISSIONS = {
     "workflow.budget":        ("Workflow", "Funds review", "Apply the FUNDS VERIFIED stamp as budget/resource advisor."),
     "workflow.return":        ("Workflow", "Return documents", "Return a document to the traveler for correction."),
     "workflow.override":      ("Workflow", "Override routing", "Skip or reassign a routing step (requires remarks)."),
+    # Travel agency ----------------------------------------------------------
+    "booking.view":           ("Travel Agency", "View booking queue", "View approved travel plans waiting for, or completed by, the travel agency."),
+    "booking.manage":         ("Travel Agency", "Record bookings", "Add reservations to an approved travel plan and mark it booked."),
     # Profiles ---------------------------------------------------------------
     "profile.edit.self":      ("Profiles", "Edit own profile", "Edit your own personal, banking and card data."),
     "profile.view.org":       ("Profiles", "View org profiles", "View traveler profiles in scope."),
@@ -106,7 +110,7 @@ DEFAULT_ROLES = {
         "name": "Approving Official (AO)", "legacy": "Level 2",
         "description": "Approves authorizations and vouchers; accountable for the necessity of travel.",
         "permissions": ["document.view.org", "workflow.approve", "workflow.return",
-                        "reports.view", "loa.view"],
+                        "reports.view", "loa.view", "plan.assign"],
     },
     "certifying_officer": {
         "name": "Certifying Officer (CO)", "legacy": "Level 2",
@@ -131,6 +135,11 @@ DEFAULT_ROLES = {
                         "admin.users", "admin.assign", "document.view.org", "workflow.override",
                         "reports.view", "reports.export", "loa.view"],
     },
+    "travel_agency": {
+        "name": "Travel Agency (TMC)", "legacy": "CTO / TMC",
+        "description": "Books reservations for approved travel plans and records confirmation numbers.",
+        "permissions": ["booking.view", "booking.manage", "document.view.org"],
+    },
     "debt_monitor": {
         "name": "Debt Management Monitor", "legacy": "Level 1",
         "description": "Tracks traveler debts and overpayments.",
@@ -152,7 +161,7 @@ DEFAULT_ROLES = {
 # Delegated administration: role -> roles its holders may grant (in their admin.assign scope)
 DEFAULT_GRANTABLE = {
     "org_dta": ["traveler", "preparer", "reviewer", "approving_official", "certifying_officer",
-                "budget_dta", "routing_official", "debt_monitor", "auditor"],
+                "budget_dta", "routing_official", "debt_monitor", "auditor", "travel_agency"],
 }
 
 SOD_RULES = {
@@ -194,7 +203,41 @@ def sync_catalog(db, seed_roles: bool = False) -> None:
         for key, targets in DEFAULT_GRANTABLE.items():
             rid = db.execute("SELECT id FROM roles WHERE key=?", (key,)).fetchone()["id"]
             set_role_grantable(db, rid, targets)
+        db.execute("INSERT OR IGNORE INTO settings(key, value, description) VALUES (?, '1', ?)",
+                   (_PLAN_ROLES_FLAG, _PLAN_ROLES_FLAG_DESC))
+    else:
+        _migrate_plan_roles(db)
     db.commit()
+
+
+_PLAN_ROLES_FLAG = "rbac_migration_plans_v1"
+_PLAN_ROLES_FLAG_DESC = "Internal: travel-plan roles and permissions were added to this database."
+
+
+def _migrate_plan_roles(db) -> None:
+    """One-time upgrade for databases seeded before travel plans existed.
+    Guarded by a settings flag so later admin edits to these roles stick."""
+    if db.execute("SELECT 1 FROM settings WHERE key=?", (_PLAN_ROLES_FLAG,)).fetchone():
+        return
+    spec = DEFAULT_ROLES["travel_agency"]
+    cur = db.execute("INSERT OR IGNORE INTO roles(key, name, description, legacy_level, is_system) VALUES (?,?,?,?,1)",
+                     ("travel_agency", spec["name"], spec["description"], spec["legacy"]))
+    if cur.rowcount:
+        set_role_permissions(db, cur.lastrowid, spec["permissions"])
+    for role_key, keys in (("approving_official", ["plan.assign"]),
+                           ("sys_admin", ["plan.assign", "booking.view", "booking.manage"])):
+        role = db.execute("SELECT id FROM roles WHERE key=?", (role_key,)).fetchone()
+        if not role:
+            continue
+        for k in keys:
+            db.execute("INSERT OR IGNORE INTO role_permissions SELECT ?, id FROM permissions WHERE key=?",
+                       (role["id"], k))
+    dta = db.execute("SELECT id FROM roles WHERE key='org_dta'").fetchone()
+    agency = db.execute("SELECT id FROM roles WHERE key='travel_agency'").fetchone()
+    if dta and agency:
+        db.execute("INSERT OR IGNORE INTO role_grantable VALUES (?,?)", (dta["id"], agency["id"]))
+    db.execute("INSERT INTO settings(key, value, description) VALUES (?, '1', ?)",
+               (_PLAN_ROLES_FLAG, _PLAN_ROLES_FLAG_DESC))
 
 
 def set_role_grantable(db, role_id: int, role_keys) -> None:

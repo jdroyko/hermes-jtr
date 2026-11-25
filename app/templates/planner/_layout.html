@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block content %}
+<div class="planner">
+  <p class="planner-progress" id="planner-progress">Step {{ step }} of {{ step_total }}: {{ screens[step - 1][1] }}</p>
+  <div class="planner-bar" aria-hidden="true"><span class="planner-bar-fill fill-{{ step }}"></span></div>
+  {% block screen %}{% endblock %}
+</div>
+{% endblock %}

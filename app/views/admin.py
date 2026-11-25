@@ -576,7 +576,7 @@ def loas():
     ids = [o["id"] for o in scoped] or [0]
     rows = db.execute(
         "SELECT l.*, o.code org_code, (SELECT COALESCE(SUM(total_estimate),0) FROM documents d WHERE d.loa_id=l.id "
-        "AND d.doc_type IN ('AUTH','LOCAL') AND d.status IN ('ROUTING','APPROVED','PAID')) obligated "
+        "AND d.is_template=0 AND d.doc_type IN ('AUTH','LOCAL') AND d.status IN ('ROUTING','APPROVED','PAID')) obligated "
         "FROM loas l JOIN orgs o ON o.id=l.org_id WHERE l.org_id IN (%s) ORDER BY o.code" % ",".join("?" * len(ids)),
         ids).fetchall()
     return render_template("admin/loas.html", loas=rows, scoped=scoped, values=values, errors=errors)
@@ -628,7 +628,7 @@ def perdiem():
 def settings():
     need("admin.settings")
     db = get_db()
-    rows = db.execute("SELECT * FROM settings ORDER BY key").fetchall()
+    rows = db.execute("SELECT * FROM settings WHERE key NOT LIKE 'rbac_migration_%' ORDER BY key").fetchall()
     errors = {}
     if request.method == "POST":
         numeric = {"pov_mileage_rate", "receipt_threshold", "first_last_day_pct", "ltdy_pct_31_180",

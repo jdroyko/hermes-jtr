@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Travel agency queue{% endblock %}
+{% macro booking_table(rows, label) %}
+{% call m.table_wrap(label) %}
+<table class="table">
+  <caption class="sr-only">{{ label }}</caption>
+  <thead><tr><th scope="col">Authorization</th><th scope="col">Traveler</th><th scope="col">Trip</th><th scope="col" class="num">Estimate</th></tr></thead>
+  <tbody>
+  {% for b in rows %}
+  <tr>
+    <th scope="row"><a href="{{ url_for('agency.detail', booking_id=b.id) }}">{{ b.doc_number }}</a></th>
+    <td>{{ b.last_name }}, {{ b.first_name }} ({{ b.org_code }})</td>
+    <td>{{ b.trip_description }}<br><span class="muted">{{ b.start_date|datefmt }} to {{ b.end_date|datefmt }}</span></td>
+    <td class="num">{{ b.total_estimate|money }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% endmacro %}
+{% block content %}
+<h1>Travel agency queue</h1>
+<p>Approved travel plans waiting for reservations. Open one to record bookings and confirmation numbers.</p>
+
+<section aria-labelledby="pending-title">
+  <h2 id="pending-title">Waiting for booking ({{ pending|length }})</h2>
+  {% if pending %}{{ booking_table(pending, 'Waiting for booking') }}{% else %}<p>Nothing is waiting.</p>{% endif %}
+</section>
+
+<section aria-labelledby="booked-title">
+  <h2 id="booked-title">Booked ({{ booked|length }})</h2>
+  {% if booked %}{{ booking_table(booked, 'Booked') }}{% else %}<p>No booked trips yet.</p>{% endif %}
+</section>
+
+{% if cancelled %}
+<section aria-labelledby="cancelled-title">
+  <h2 id="cancelled-title">Cancelled ({{ cancelled|length }})</h2>
+  <p>The traveler's plan was cancelled or amended. Cancel any reservations you already made with the vendor.</p>
+  {{ booking_table(cancelled, 'Cancelled bookings') }}
+</section>
+{% endif %}
+{% endblock %}

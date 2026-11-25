@@ -36,8 +36,10 @@
     <input class="input{% if width %} w-{{ width }}{% endif %}" id="{{ name }}" name="{{ name }}" type="password"
            value="{{ value if value is not none else '' }}"{% if required %} required aria-required="true"{% endif %}
            {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}{{ _described(name, hint, errors) }} {{ attrs|safe }} data-password-input>
-    <button type="button" class="btn btn-link password-toggle no-js-hide" data-password-toggle aria-pressed="false">
-      Show <span class="sr-only">password</span>
+    <button type="button" class="password-toggle no-js-hide" data-password-toggle aria-pressed="false">
+      <span class="sr-only">Show password</span>
+      <svg class="icon-eye" aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12s3.8-7 10.5-7 10.5 7 10.5 7-3.8 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/></svg>
+      <svg class="icon-eye-off" aria-hidden="true" focusable="false" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 12s3.8-7 10.5-7 10.5 7 10.5 7-3.8 7-10.5 7S1.5 12 1.5 12z"/><circle cx="12" cy="12" r="3.2"/><path d="M3 3l18 18"/></svg>
     </button>
   </div>
   {% else %}
@@ -104,13 +106,15 @@
 {% if doc %}
 <nav aria-label="Document steps" class="wizard">
   <ol>
+    {% set n = namespace(i=0) %}
     {% for key, label in steps %}
-    {% set ep = 'documents.view' if key == 'review' else 'documents.' ~ key %}
-    {% set skip = doc.doc_type == 'LOCAL' and key == 'itinerary' %}
+    {% set ep = {'review': 'documents.view', 'travel': 'travel.search'}.get(key, 'documents.' ~ key) %}
+    {% set skip = (doc.doc_type == 'LOCAL' and key == 'itinerary') or (doc.doc_type != 'AUTH' and key == 'travel') %}
     {% if not skip %}
+    {% set n.i = n.i + 1 %}
     <li class="{{ 'current' if key == current }}">
       <a href="{{ url_for(ep, doc_id=doc.id) }}" {% if key == current %}aria-current="step"{% endif %}>
-        <span class="step-num" aria-hidden="true">{{ loop.index }}</span> {{ label }}{% if key == current %}<span class="sr-only"> (current step)</span>{% endif %}
+        <span class="step-num" aria-hidden="true">{{ n.i }}</span> {{ label }}{% if key == current %}<span class="sr-only"> (current step)</span>{% endif %}
       </a>
     </li>
     {% endif %}

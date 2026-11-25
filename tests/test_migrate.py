@@ -42,5 +42,13 @@ def test_migrate_upgrades_old_database(tmp_path):
     orders = [r["sort_order"] for r in conn.execute(
         "SELECT sort_order FROM document_stops ORDER BY arrive_date")]
     assert orders == [0, 1]  # backfilled in arrival-date order
+    stop_cols = {r["name"] for r in conn.execute("PRAGMA table_info(document_stops)")}
+    assert {"location_text", "location_state"} <= stop_cols
+    assert conn.execute("SELECT 1 FROM per_diem_rates WHERE location='Standard OCONUS'").fetchone()
 
     assert conn.execute("SELECT name FROM sqlite_master WHERE name='attachments'").fetchone()
+
+    doc_cols = {r["name"] for r in conn.execute("PRAGMA table_info(documents)")}
+    assert {"is_plan", "is_template", "template_id", "preapproved_by"} <= doc_cols
+    for table in ("plan_assignees", "bookings", "booking_items"):
+        assert conn.execute("SELECT name FROM sqlite_master WHERE name=?", (table,)).fetchone(), table

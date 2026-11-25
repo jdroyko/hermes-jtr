@@ -1,17 +1,17 @@
 from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 
-from .. import jtr, rbac, workflow
+from .. import geo, jtr, rbac, workflow
 from ..db import audit, get_db
 from ._util import (Form, can_amend, can_cancel, can_edit, can_sign, get_doc, is_own, load_children, me,
                     next_doc_number, next_sort_order, recalc, travelers_for_preparer)
 
 bp = Blueprint("documents", __name__, url_prefix="/documents")
 
-STEPS = [("trip", "Trip details"), ("itinerary", "Itinerary & lodging"),
+STEPS = [("trip", "Trip details"), ("itinerary", "Itinerary & lodging"), ("travel", "Flights, hotels & cars"),
          ("expenses", "Expenses"), ("review", "Review & sign")]
 
 
-def _loas_for(org_id):
+def loas_for(org_id):
     ids = rbac.org_ancestors(org_id)
     return get_db().execute("SELECT * FROM loas WHERE active=1 AND org_id IN (%s) ORDER BY label"
                             % ",".join("?" * len(ids)), ids).fetchall()
@@ -22,32 +22,75 @@ def _locations():
                             "GROUP BY location, state ORDER BY location").fetchall()
 
 
-def _resolve_location(db, doc_id, location_text, new_state):
-    """Match a typed TDY location against existing rates (active or
-    pending, case-insensitive), or propose it as a new one. Returns
-    (rate_id, is_new, error)."""
+def tidy_place(text):
+    """'SAn francisco' -> 'San Francisco'; short all-caps words (AFB, JB, NAS) stay."""
+    return " ".join(w if (w.isupper() and len(w) <= 4) or not w.isalpha() else w[:1].upper() + w[1:].lower()
+                    for w in text.split())
+
+
+def resolve_location(db, location_text, new_state):
+    """Match a typed TDY location against the per diem rate list
+    (case-insensitive). Anything else is accepted as typed and paid at the
+    Standard CONUS rate (lower 48 states and DC) or Standard OCONUS rate.
+    With no state given, the state is looked up from known cities and bases;
+    a place that can't be placed is assumed to be in CONUS (state None).
+    Returns (rate_id, custom, error); custom is (place, state) or None."""
     location_text = (location_text or "").strip()
-    new_state = (new_state or "").strip()
-    loc, state = location_text, new_state
+    loc, state = location_text, (new_state or "").strip()
     if not state and "," in location_text:
         loc, state = (p.strip() for p in location_text.rsplit(",", 1))
     if not loc:
-        return None, False, None  # caller already requires location_text
+        return None, None, None  # caller already requires location_text
     if not state:
-        return None, False, "Enter the state or country for this location, or pick one from the suggestions."
-    row = db.execute("SELECT id FROM per_diem_rates WHERE location=? COLLATE NOCASE AND state=? COLLATE NOCASE",
-                     (loc, state)).fetchone()
-    if row:
-        return row["id"], False, None
-    conus = db.execute("SELECT lodging, mie FROM per_diem_rates WHERE location='Standard CONUS' LIMIT 1").fetchone()
-    rid = db.execute(
-        "INSERT INTO per_diem_rates(location, state, lodging, mie, fiscal_year, status, requested_by, document_id)"
-        " VALUES (?,?,?,?,CAST(strftime('%Y','now') AS INTEGER),'pending',?,?)",
-        (loc, state.upper(), conus["lodging"], conus["mie"], me(), doc_id)).lastrowid
-    return rid, True, None
+        rows = db.execute("SELECT MIN(id) id FROM per_diem_rates WHERE location=? COLLATE NOCASE "
+                          "GROUP BY state", (loc,)).fetchall()
+        if len(rows) == 1:
+            return rows[0]["id"], None, None
+        found = geo.locate(loc)
+        state = found[3] if found else ""
+    if state:
+        row = db.execute("SELECT id FROM per_diem_rates WHERE location=? COLLATE NOCASE AND state=? COLLATE NOCASE",
+                         (loc, state)).fetchone()
+        if row:
+            return row["id"], None, None
+    code = jtr.conus_code(state) if state else None
+    standard = jtr.STANDARD_OCONUS if state and not code else jtr.STANDARD_CONUS
+    rate = db.execute("SELECT MIN(id) id FROM per_diem_rates WHERE location=?", (standard,)).fetchone()
+    if rate["id"] is None:
+        return None, None, "No %s per diem rate is set up. Ask your administrator to add one." % standard
+    place = tidy_place(loc)
+    if code and place.lower() == jtr.CONUS_STATES[code].lower():
+        place = jtr.CONUS_STATES[code]
+    return rate["id"], (place, code or state or None), None
+
+
+def place_notice(custom):
+    """Flash text for a place with no locality rate of its own."""
+    name, state = custom
+    if not state:
+        return ("%s has no locality per diem rate, so the Standard CONUS rate applies. If it is outside the "
+                "continental US, remove it and add it again with its country, like %s, Germany." % (name, name))
+    std = "CONUS" if jtr.conus_code(state) else "OCONUS"
+    return "%s, %s has no locality per diem rate, so the Standard %s rate applies." % (name, state, std)
+
+
+def validate_trip(f):
+    f.choice("trip_purpose", "Trip purpose", [k for k, _ in jtr.TRIP_PURPOSES])
+    f.required("trip_description", "Trip description")
+    s = f.date("start_date", "Start date")
+    e = f.date("end_date", "End date")
+    if s and e and e < s:
+        f.errors["end_date"] = "End date must be the same as or after the start date."
+    return s, e
 
 
 # --------------------------------------------------------------------- list
+# Whitelisted ORDER BY expressions for the Documents list (never user text).
+_DOC_SORTS = {"doc": "d.doc_number", "type": "d.doc_type", "traveler": "u.last_name COLLATE NOCASE, u.first_name COLLATE NOCASE",
+              "org": "o.code", "trip": "d.trip_description COLLATE NOCASE", "dates": "d.start_date",
+              "status": "d.status", "total": "d.total_estimate"}
+
+
 @bp.route("/")
 def index():
     db = get_db()
@@ -67,15 +110,28 @@ def index():
     if status:
         where.append("d.status=?")
         params.append(status)
+    else:
+        # Cancelled documents stay out of the default list; pick the
+        # Cancelled status filter to see them.
+        where.append("d.status<>'CANCELLED'")
     if doc_type:
         where.append("d.doc_type=?")
         params.append(doc_type)
+    where.append("d.is_template=0")
+    sort = request.args.get("sort", "")
+    if sort not in _DOC_SORTS:
+        sort = ""
+    direction = "desc" if request.args.get("dir") == "desc" else "asc"
+    order = ("%s %s, d.id" % (_DOC_SORTS[sort], direction.upper())) if sort else "d.updated_at DESC"
     sql = ("SELECT d.*, u.first_name, u.last_name, o.code org_code FROM documents d "
            "JOIN users u ON u.id=d.traveler_id JOIN orgs o ON o.id=d.org_id")
     if where:
         sql += " WHERE " + " AND ".join(where)
-    docs = db.execute(sql + " ORDER BY d.updated_at DESC LIMIT 500", params).fetchall()
-    return render_template("documents/index.html", docs=docs, status=status, doc_type=doc_type, scope=scope)
+    docs = db.execute(sql + " ORDER BY " + order + " LIMIT 500", params).fetchall()
+    # Travelers looking only at their own documents don't need a Traveler column.
+    show_traveler = any(d["traveler_id"] != me() for d in docs)
+    return render_template("documents/index.html", docs=docs, status=status, doc_type=doc_type, scope=scope,
+                           sort=sort, direction=direction, show_traveler=show_traveler)
 
 
 @bp.route("/queue")
@@ -93,7 +149,7 @@ def _visible_docs(status_list):
     """Documents in the given statuses that the current user may view,
     mirroring index()'s own-or-org-scoped visibility rule."""
     db = get_db()
-    where = ["d.status IN (%s)" % ",".join("?" * len(status_list))]
+    where = ["d.status IN (%s)" % ",".join("?" * len(status_list)), "d.is_template=0"]
     params = list(status_list)
     org_clause = "(d.traveler_id=? OR d.created_by=?)"
     org_params = [me(), me()]
@@ -146,9 +202,11 @@ def board():
 # ------------------------------------------------------------------- create
 @bp.route("/new", methods=["GET", "POST"])
 def new():
-    doc_type = request.values.get("type", "AUTH")
-    if doc_type not in ("AUTH", "LOCAL"):
+    requested = request.values.get("type", "AUTH")
+    if requested not in ("AUTH", "LOCAL", "PLAN"):
         abort(404)
+    is_plan = requested == "PLAN"
+    doc_type = "AUTH" if is_plan else requested
     travelers = travelers_for_preparer()
     if not travelers:
         abort(403)
@@ -162,12 +220,7 @@ def new():
         traveler = next((t for t in travelers if str(t["id"]) == tid), None)
         if traveler is None:
             f.errors["traveler_id"] = "Select a traveler you are authorized to prepare documents for."
-        f.choice("trip_purpose", "Trip purpose", [k for k, _ in jtr.TRIP_PURPOSES])
-        f.required("trip_description", "Trip description")
-        s = f.date("start_date", "Start date")
-        e = f.date("end_date", "End date")
-        if s and e and e < s:
-            f.errors["end_date"] = "End date must be the same as or after the start date."
+        s, e = validate_trip(f)
         errors = f.errors
         if f.ok:
             db = get_db()
@@ -175,20 +228,21 @@ def new():
             rl = workflow.resolve_routing_list(traveler, traveler["org_id"])
             doc_id = db.execute(
                 "INSERT INTO documents(doc_number, doc_type, traveler_id, created_by, org_id, trip_purpose,"
-                " trip_description, start_date, end_date, loa_id, routing_list_id, trip_type)"
-                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                " trip_description, start_date, end_date, loa_id, routing_list_id, trip_type, is_plan)"
+                " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (next_doc_number(doc_type), doc_type, traveler["id"], me(), traveler["org_id"],
                  values["trip_purpose"], values["trip_description"], s, e, loa, rl,
-                 "LOCAL" if doc_type == "LOCAL" else "TDY")).lastrowid
+                 "LOCAL" if doc_type == "LOCAL" else "TDY", int(is_plan))).lastrowid
             workflow.log(doc_id, me(), "CREATE", "CREATED")
             audit(me(), "DOC_CREATE", "document:%d" % doc_id)
             db.commit()
-            flash("%s created. Add your itinerary next." % workflow.DOC_TYPE_LABELS[doc_type], "success")
+            label = "Travel plan" if is_plan else workflow.DOC_TYPE_LABELS[doc_type]
+            flash("%s created. Add your itinerary next." % label, "success")
             nxt = "expenses" if doc_type == "LOCAL" else "itinerary"
             return redirect(url_for("documents." + nxt, doc_id=doc_id))
     org_id = g.user["org_id"]
-    return render_template("documents/trip.html", doc=None, doc_type=doc_type, values=values, errors=errors,
-                           travelers=travelers, loas=_loas_for(org_id), purposes=jtr.TRIP_PURPOSES,
+    return render_template("documents/trip.html", doc=None, doc_type=requested, values=values, errors=errors,
+                           travelers=travelers, loas=loas_for(org_id), purposes=jtr.TRIP_PURPOSES,
                            steps=STEPS, current="trip")
 
 
@@ -212,8 +266,9 @@ def create_voucher(doc_id):
         (next_doc_number("VOUCHER"), auth["traveler_id"], me(), auth["org_id"], auth["trip_purpose"],
          auth["trip_description"], auth["start_date"], auth["end_date"], auth["loa_id"],
          auth["routing_list_id"], doc_id)).lastrowid
-    db.execute("INSERT INTO document_stops(document_id, rate_id, arrive_date, depart_date, gov_quarters, sort_order) "
-               "SELECT ?, rate_id, arrive_date, depart_date, gov_quarters, sort_order FROM document_stops "
+    db.execute("INSERT INTO document_stops(document_id, rate_id, arrive_date, depart_date, gov_quarters, sort_order, "
+               "location_text, location_state) SELECT ?, rate_id, arrive_date, depart_date, gov_quarters, sort_order, "
+               "location_text, location_state FROM document_stops "
                "WHERE document_id=?", (vid, doc_id))
     db.execute("INSERT INTO expenses(document_id, expense_date, category, description, amount, miles, payment_method)"
                " SELECT ?, expense_date, category, description, amount, miles, payment_method FROM expenses "
@@ -241,12 +296,7 @@ def trip(doc_id):
     if request.method == "POST":
         f = Form(request.form)
         values.update({k: f.get(k) for k in values})
-        f.choice("trip_purpose", "Trip purpose", [k for k, _ in jtr.TRIP_PURPOSES])
-        f.required("trip_description", "Trip description")
-        s = f.date("start_date", "Start date")
-        e = f.date("end_date", "End date")
-        if s and e and e < s:
-            f.errors["end_date"] = "End date must be the same as or after the start date."
+        s, e = validate_trip(f)
         errors = f.errors
         if f.ok:
             db = get_db()
@@ -259,7 +309,7 @@ def trip(doc_id):
             return redirect(url_for("documents.expenses" if doc["doc_type"] == "LOCAL" else "documents.itinerary",
                                     doc_id=doc_id))
     return render_template("documents/trip.html", doc=doc, doc_type=doc["doc_type"], values=values, errors=errors,
-                           travelers=None, loas=_loas_for(doc["org_id"]), purposes=jtr.TRIP_PURPOSES,
+                           travelers=None, loas=loas_for(doc["org_id"]), purposes=jtr.TRIP_PURPOSES,
                            steps=STEPS, current="trip")
 
 
@@ -273,6 +323,8 @@ def itinerary(doc_id):
     if request.method == "POST":
         action = request.form.get("action", "add")
         if action == "delete":
+            db.execute("DELETE FROM expenses WHERE id IN (SELECT expense_id FROM trip_selections "
+                       "WHERE stop_id=? AND document_id=?)", (request.form.get("stop_id"), doc_id))
             db.execute("DELETE FROM document_stops WHERE id=? AND document_id=?",
                        (request.form.get("stop_id"), doc_id))
             recalc(doc_id)
@@ -303,22 +355,22 @@ def itinerary(doc_id):
                     f.errors["arrive_date"] = "Dates must fall within the trip dates (%s to %s)." % (
                         doc["start_date"], doc["end_date"])
             nightly = f.number("lodging_nightly", "Nightly lodging cost", required=False)
-            rid, is_new_location = None, False
+            rid, custom = None, None
             if location_text:
-                rid, is_new_location, loc_error = _resolve_location(db, doc_id, location_text, values["new_state"])
+                rid, custom, loc_error = resolve_location(db, location_text, values["new_state"])
                 if loc_error:
                     f.errors["new_state"] = loc_error
             errors = f.errors
             if f.ok:
                 db.execute("INSERT INTO document_stops(document_id, rate_id, arrive_date, depart_date, "
-                           "lodging_nightly, gov_quarters, sort_order) VALUES (?,?,?,?,?,?,?)",
+                           "lodging_nightly, gov_quarters, sort_order, location_text, location_state) "
+                           "VALUES (?,?,?,?,?,?,?,?,?)",
                            (doc_id, rid, a, d, nightly, 1 if values["gov_quarters"] else 0,
-                            next_sort_order(doc_id)))
+                            next_sort_order(doc_id), custom[0] if custom else None, custom[1] if custom else None))
                 recalc(doc_id)
                 db.commit()
-                if is_new_location:
-                    flash("Location added. '%s' is new and will need your Approving Official's approval."
-                         % location_text, "success")
+                if custom:
+                    flash("Location added. " + place_notice(custom), "success")
                 else:
                     flash("Location added.", "success")
                 return redirect(request.path)
@@ -417,6 +469,8 @@ def expenses(doc_id):
 @bp.route("/<int:doc_id>")
 def view(doc_id):
     doc = get_doc(doc_id)
+    if doc["is_template"]:
+        return redirect(url_for("plans.review", plan_id=doc_id))
     db = get_db()
     stops, exps = load_children(doc_id)
     pd, exp_total, total = jtr.document_totals(doc, stops, exps)
@@ -439,11 +493,17 @@ def view(doc_id):
                           "('AUTH','LOCAL') AND status IN ('ROUTING','APPROVED','PAID') AND id<>?",
                           (loa["id"], doc_id)).fetchone()["s"]
         funds = {"available": loa["budget_amount"] - used}
+    booking = db.execute("SELECT * FROM bookings WHERE document_id=?", (doc_id,)).fetchone()
+    booking_items = db.execute("SELECT * FROM booking_items WHERE booking_id=? ORDER BY id",
+                               (booking["id"],)).fetchall() if booking else []
+    selections = db.execute("SELECT * FROM trip_selections WHERE document_id=? ORDER BY start_date, id",
+                            (doc_id,)).fetchall()
+    comparison = db.execute("SELECT * FROM trip_comparisons WHERE document_id=?", (doc_id,)).fetchone()
     return render_template(
         "documents/view.html", doc=doc, stops=stops, expenses=exps, per_diem=pd, exp_total=exp_total,
         total=total, findings=findings, traveler=traveler, preparer=preparer, org=org, loa=loa, history=history,
         steps=steps, current_step=cur, can_act=act_ok, act_reason=act_reason, parent=parent, voucher=voucher,
-        funds=funds, editable=can_edit(doc), signable=can_sign(doc), cancellable=can_cancel(doc),
+        funds=funds, booking=booking, booking_items=booking_items, selections=selections, comparison=comparison, editable=can_edit(doc), signable=can_sign(doc), cancellable=can_cancel(doc),
         amendable=can_amend(doc), returnable=workflow.can_return(me(), doc),
         overridable=doc["status"] == "ROUTING" and rbac.has_perm(me(), "workflow.override", doc["org_id"]),
         own=is_own(doc), wizard_steps=STEPS, errors=request.args.get("e"),
@@ -503,12 +563,15 @@ def action(doc_id):
             if not can_cancel(doc):
                 raise PermissionError("You cannot cancel this document.")
             db.execute("UPDATE documents SET status='CANCELLED', current_step_seq=NULL WHERE id=?", (doc_id,))
+            db.execute("UPDATE bookings SET status='CANCELLED' WHERE document_id=?", (doc_id,))
             workflow.log(doc_id, me(), "CANCEL", "CANCELLED", remarks)
             msg = "Document cancelled."
         elif act == "amend":
             if not can_amend(doc):
                 raise PermissionError("You cannot amend this document.")
-            db.execute("UPDATE documents SET status='CREATED', amendment=amendment+1 WHERE id=?", (doc_id,))
+            db.execute("UPDATE documents SET status='CREATED', amendment=amendment+1, preapproved_by=NULL "
+                       "WHERE id=?", (doc_id,))
+            db.execute("UPDATE bookings SET status='CANCELLED' WHERE document_id=?", (doc_id,))
             workflow.log(doc_id, me(), "AMEND", "AMENDED", remarks)
             msg = "Amendment started. Make your changes, then sign again."
         else:

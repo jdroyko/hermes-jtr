@@ -1,6 +1,6 @@
-from flask import Blueprint, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
 
-from .. import rbac, workflow
+from .. import ACCESSIBLE_THEME, MODERN_THEME, THEMES, inventory, rbac, workflow
 from ..db import audit, get_db
 from ._util import Form, me
 
@@ -10,7 +10,7 @@ bp = Blueprint("main", __name__)
 @bp.route("/")
 def home():
     db = get_db()
-    mine = db.execute("SELECT * FROM documents WHERE traveler_id=? AND status NOT IN ('CANCELLED') "
+    mine = db.execute("SELECT * FROM documents WHERE traveler_id=? AND is_template=0 AND status NOT IN ('CANCELLED') "
                       "ORDER BY updated_at DESC LIMIT 10", (me(),)).fetchall()
     queue = workflow.queue_for(me())
     returned = [d for d in mine if d["status"] == "RETURNED"]
@@ -24,6 +24,43 @@ def home():
 @bp.route("/profile", methods=["GET", "POST"])
 def profile():
     return _profile_form(g.user, self_service=True)
+
+
+@bp.route("/profile/memberships", methods=["POST"])
+def memberships():
+    db = get_db()
+    if request.form.get("action") == "remove":
+        db.execute("DELETE FROM user_memberships WHERE id=? AND user_id=?", (request.form.get("membership_id"), me()))
+        db.commit()
+        flash("Membership removed.", "success")
+        return redirect(url_for(".profile") + "#memberships-title")
+    program = request.form.get("program", "")
+    last4 = (request.form.get("member_last4") or "").strip()
+    if program not in inventory.PROGRAMS or (last4 and not (last4.isalnum() and len(last4) == 4)):
+        flash("Choose a program, and enter exactly 4 letters or digits for the member number, or leave it blank.",
+              "error")
+        return redirect(url_for(".profile") + "#memberships-title")
+    db.execute("INSERT INTO user_memberships(user_id, program, member_last4) VALUES (?,?,?) "
+               "ON CONFLICT(user_id, program) DO UPDATE SET member_last4=excluded.member_last4",
+               (me(), program, last4.upper()))
+    audit(me(), "MEMBERSHIP_ADD", "user:%d" % me(), program)
+    db.commit()
+    flash("%s added. Results from %s now show a member badge." % (inventory.PROGRAMS[program][1],
+          " and ".join(inventory.PROGRAMS[program][2][:2]) + (" and others" if len(inventory.PROGRAMS[program][2]) > 2 else "")),
+          "success")
+    return redirect(url_for(".profile") + "#memberships-title")
+
+
+@bp.route("/profile/theme", methods=["POST"])
+def theme():
+    choice = request.form.get("theme")
+    if choice not in THEMES:
+        abort(400)
+    get_db().execute("UPDATE users SET theme=? WHERE id=?", (choice, me()))
+    audit(me(), "THEME_CHANGE", "user:%d" % me(), choice)
+    get_db().commit()
+    flash("Display style changed to %s." % THEMES[choice][0], "success")
+    return redirect(url_for(".profile"))
 
 
 def _profile_form(user, self_service):
@@ -70,4 +107,22 @@ def _profile_form(user, self_service):
     org = db.execute("SELECT * FROM orgs WHERE id=?", (user["org_id"],)).fetchone()
     return render_template("profile.html", values=values, errors=errors, editable=editable, org=org,
                            routing_lists=routing_lists, self_service=self_service, subject=user,
-                           perms=rbac.user_permissions(user["id"]) if self_service else None)
+                           perms=rbac.user_permissions(user["id"]) if self_service else None,
+                           memberships=db.execute("SELECT * FROM user_memberships WHERE user_id=? ORDER BY program",
+                                                  (user["id"],)).fetchall() if self_service else None)
+
+
+@bp.route("/profile/theme/toggle", methods=["POST"])
+def theme_toggle():
+    """Header switch between the 508 accessible design and the modern design."""
+    row = get_db().execute("SELECT theme FROM users WHERE id=?", (me(),)).fetchone()
+    choice = ACCESSIBLE_THEME if row["theme"] == MODERN_THEME else MODERN_THEME
+    get_db().execute("UPDATE users SET theme=? WHERE id=?", (choice, me()))
+    audit(me(), "THEME_CHANGE", "user:%d" % me(), choice)
+    get_db().commit()
+    nxt = request.form.get("next", "")
+    if not nxt.startswith("/") or nxt.startswith("//") or "\\" in nxt:
+        nxt = url_for(".home")
+    flash("Switched to the %s." % ("modern design (not 508 compliant)" if choice == MODERN_THEME
+                                  else "508 accessible design"), "success")
+    return redirect(nxt)

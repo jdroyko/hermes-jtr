@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Group travel plans{% endblock %}
+{% block content %}
+<h1>Group travel plans</h1>
+<p>Build one trip estimate and issue it to several travelers. Each traveler gets their own authorization. It goes
+to funds verification first, and then your approval is applied automatically.</p>
+<p><a class="btn btn-primary" href="{{ url_for('plans.new') }}">New group plan</a></p>
+{% if plans %}
+{% call m.table_wrap('Group travel plans') %}
+<table class="table">
+  <caption class="sr-only">Your group travel plans</caption>
+  <thead><tr><th scope="col">Plan</th><th scope="col">Trip</th><th scope="col">Status</th><th scope="col" class="num">Travelers</th><th scope="col" class="num">Estimate per traveler</th></tr></thead>
+  <tbody>
+  {% for p in plans %}
+  <tr>
+    <th scope="row"><a href="{{ url_for('plans.review', plan_id=p.id) }}">{{ p.doc_number }}</a></th>
+    <td>{{ p.trip_description }}<br><span class="muted">{{ p.start_date|datefmt }} to {{ p.end_date|datefmt }}</span></td>
+    <td>{{ m.status_tag(p.status, {'CREATED': 'Draft', 'ISSUED': STATUS_LABELS['ISSUED']}) }}</td>
+    <td class="num">{{ p.assignees }}</td>
+    <td class="num">{{ p.total_estimate|money }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% else %}
+<p>You have not created any group plans yet.</p>
+{% endif %}
+{% endblock %}

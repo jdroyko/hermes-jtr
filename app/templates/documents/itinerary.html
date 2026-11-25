@@ -30,7 +30,7 @@ Add each place where you will stay overnight.</p>
         <span class="drag-handle no-js-hide" draggable="true" aria-hidden="true" tabindex="-1">&#10495;</span>
       </div>
     </td>
-    <th scope="row">{{ s.location }}, {{ s.state }}{% if s.rate_status == 'pending' %} <span class="muted">(new &ndash; pending AO approval)</span>{% endif %}</th>
+    <th scope="row">{{ s.location }}, {{ s.state }}{% if s.location_text %} <span class="muted">(Standard {{ 'CONUS' if s.rate_location == 'Standard CONUS' else 'OCONUS' }} rate)</span>{% elif s.rate_status == 'pending' %} <span class="muted">(new &ndash; pending AO approval)</span>{% endif %}</th>
     <td>{{ s.arrive_date|datefmt }}</td>
     <td>{{ s.depart_date|datefmt }}</td>
     <td>{{ s.nights }}</td>
@@ -70,13 +70,13 @@ Add each place where you will stay overnight.</p>
 <form method="post" novalidate>
   {{ m.csrf() }}<input type="hidden" name="action" value="add">
   {{ m.input('location_text', 'TDY location', values.location_text, errors, required=True,
-     hint="Start typing a city, base or installation. If it isn't listed, type its full name and also enter its state or country below.",
+     hint="Type any city, base or installation. Pick a suggestion to use its locality per diem rate. Places not in the suggestions use the Standard CONUS rate (lower 48 states and DC) or the Standard OCONUS rate (everywhere else).",
      attrs='list="location-options" autocomplete="off"') }}
   <datalist id="location-options">
     {% for l in locations %}<option value="{{ l.location }}, {{ l.state }}"></option>{% endfor %}
   </datalist>
-  {{ m.input('new_state', 'State or country (new locations only)', values.new_state, errors, width='sm',
-     hint='Only needed when the location above is not already in the suggestions.') }}
+  {{ m.input('new_state', 'State or country', values.new_state, errors, width='sm',
+     hint='Add it if the place is outside the continental US or shares its name with a city elsewhere, like Ramstein AB, Germany.') }}
   <div class="grid-2">
     {{ m.input('arrive_date', 'Arrival date', values.arrive_date, errors, type='date', required=True) }}
     {{ m.input('depart_date', 'Departure date', values.depart_date, errors, type='date', required=True) }}
@@ -98,7 +98,8 @@ Add each place where you will stay overnight.</p>
 </section>
 
 <div class="button-row">
-  <a class="btn btn-primary" href="{{ url_for('documents.expenses', doc_id=doc.id) }}">Continue to expenses</a>
+  {% if doc.doc_type == 'AUTH' %}<a class="btn btn-primary" href="{{ url_for('travel.search', doc_id=doc.id) }}">Continue to flights, hotels and cars</a>
+  {% else %}<a class="btn btn-primary" href="{{ url_for('documents.expenses', doc_id=doc.id) }}">Continue to expenses</a>{% endif %}
   <a class="btn btn-secondary" href="{{ url_for('documents.trip', doc_id=doc.id) }}">Back to trip details</a>
 </div>
 {% endblock %}

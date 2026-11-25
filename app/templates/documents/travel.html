@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% import "_travel.html" as tv with context %}
+{% set kind_label = {'AIR': 'flights', 'LODGING': 'hotels', 'RENTAL_CAR': 'rental cars'}[kind] %}
+{% block title %}{{ doc.doc_number }}: Flights, hotels and cars{% endblock %}
+{% block content %}
+<h1>{{ doc.doc_number }}: Flights, hotels and cars</h1>
+{{ m.wizard(steps, current, doc) }}
+<p>Search for travel at your TDY locations. What you pick is added to your cost estimate, and once your
+{{ 'plan' if doc.is_plan else 'authorization' }} is approved the travel agency books it.
+Options marked <strong>Out of policy</strong> need a justification that your Approving Official will see.</p>
+<div class="alert alert-info" role="note"><span class="alert-label">Note:</span> Results are sample data. No real reservation is made.</div>
+{{ m.error_summary(errors) }}
+
+{% if not stops %}
+<div class="card card-warn">
+  <h2>Add a TDY location first</h2>
+  <p>Flights, hotels and cars are searched for the places on your itinerary.</p>
+  <p><a class="btn btn-primary" href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Go to itinerary</a></p>
+</div>
+{% else %}
+
+<section aria-labelledby="sel-title" class="card">
+  <h2 id="sel-title">Your selections ({{ selections|length }})</h2>
+  {% if selections %}
+  {% call m.table_wrap('Your selections') %}
+  <table class="table table-compact">
+    <caption class="sr-only">Flights, hotels and cars you selected</caption>
+    <thead><tr><th scope="col">Type</th><th scope="col">Selection</th><th scope="col">Dates</th><th scope="col">Policy</th><th scope="col" class="num">Estimated cost</th><th scope="col">Remove</th></tr></thead>
+    <tbody>
+    {% for s in selections %}
+    <tr>
+      <td>{{ TRAVEL_KINDS[s.kind] }}</td>
+      <th scope="row">{{ s.title }}{% if s.kind == 'LODGING' %}<br><span class="muted">{{ s.unit_price|money }} a night</span>{% endif %}</th>
+      <td>{{ s.start_date|datefmt }}{% if s.end_date and s.end_date != s.start_date %} to {{ s.end_date|datefmt }}{% endif %}</td>
+      <td>{% if s.in_policy %}<span class="tag tag-approved">In policy</span>{% else %}<span class="tag tag-returned">Out of policy</span><br><span class="muted">{{ s.justification }}</span>{% endif %}</td>
+      <td class="num">{{ s.amount|money }}</td>
+      <td><form method="post" class="inline">{{ m.csrf() }}<input type="hidden" name="action" value="remove"><input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="selection_id" value="{{ s.id }}">
+        <button type="submit" class="btn btn-small btn-secondary">Remove<span class="sr-only"> {{ s.title }}</span></button></form></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+  <p class="hint">Flights and rental cars are added to your expenses. Hotels are covered by per diem: the estimate uses the locality lodging maximum, as the JTR requires.</p>
+  {% else %}<p>Nothing selected yet.</p>{% endif %}
+</section>
+
+<nav aria-label="Travel search" class="subnav search-tabs">
+  <ul>
+    {% for k, label in tabs %}
+    <li><a href="{{ url_for('travel.search', doc_id=doc.id, kind=k, stop_id=values.stop_id) }}" {% if k == kind %}aria-current="page"{% endif %}>{{ label }}</a></li>
+    {% endfor %}
+  </ul>
+</nav>
+
+{% if confirm %}
+<section aria-labelledby="confirm-title" class="card card-warn">
+  <h2 id="confirm-title">Justify an out-of-policy choice</h2>
+  <p><strong>{{ confirm.title }}</strong>, {{ confirm.total|money }}. {{ confirm.policy_reason }}</p>
+  <form method="post" novalidate>
+    {{ m.csrf() }}
+    <input type="hidden" name="action" value="select"><input type="hidden" name="confirming" value="1">
+    <input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="option_id" value="{{ confirm.id }}">
+    <input type="hidden" name="stop_id" value="{{ values.stop_id }}">
+    {% if kind == 'AIR' %}<input type="hidden" name="origin" value="{{ values.origin }}"><input type="hidden" name="depart" value="{{ values.depart }}"><input type="hidden" name="return" value="{{ values['return'] }}">{% endif %}
+    {{ m.textarea('justification', 'Justification', '', errors, required=True, rows=3, hint='For example: no in-policy option is available near the work site, or a medical need.') }}
+    <div class="button-row">
+      <button type="submit" class="btn btn-primary">Add with justification</button>
+      <a class="btn btn-secondary" href="{{ url_for('travel.search', doc_id=doc.id, kind=kind, stop_id=values.stop_id, origin=values.origin if kind == 'AIR' else None) }}">Cancel</a>
+    </div>
+  </form>
+</section>
+{% else %}
+
+<section aria-labelledby="search-title">
+  <h2 id="search-title">Search {{ kind_label }}</h2>
+  <form method="get" novalidate class="card">
+    <input type="hidden" name="kind" value="{{ kind }}"><input type="hidden" name="searched" value="1">
+    <div class="filter-bar">
+      {% if kind == 'AIR' %}
+      {{ m.input('origin', 'Departing from', values.origin, errors, required=True, hint='City or airport, like Dayton, OH or DAY.') }}
+      {% endif %}
+      <div class="field">
+        <label for="stop_id">{{ 'Flying to' if kind == 'AIR' else 'TDY location' }}</label>
+        <select class="input" id="stop_id" name="stop_id">
+          {% for s in stops %}<option value="{{ s.id }}" {% if s.id|string == values.stop_id %}selected{% endif %}>{{ place(s) }} ({{ s.arrive_date|datefmt }} to {{ s.depart_date|datefmt }})</option>{% endfor %}
+        </select>
+      </div>
+      {% if kind == 'AIR' %}
+      {{ m.input('depart', 'Departure date', values.depart, errors, type='date', required=True) }}
+      {{ m.input('return', 'Return date', values['return'], errors, type='date', required=True) }}
+      {% endif %}
+      <div class="field">
+        <label for="sort">Sort by</label>
+        <select class="input" id="sort" name="sort">
+          {% for k, label in sorts %}<option value="{{ k }}" {% if k == sort %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    {{ m.checkbox('in_policy_only', 'Show only in-policy options', in_policy_only) }}
+    <button type="submit" class="btn btn-primary">Search {{ kind_label }}</button>
+  </form>
+  {% if kind == 'LODGING' and stop %}<p>Lodging maximum for {{ place(stop) }}: <strong>{{ lodging_max|money }}</strong> a night.{% if stop.gov_quarters %} You marked government quarters for this stay, so commercial lodging is not reimbursed.{% endif %}</p>{% endif %}
+</section>
+
+{% if results %}
+<section aria-labelledby="results-title">
+  <h2 id="results-title">{{ results|length }} {{ kind_label }}{% if stop %} for {{ place(stop) }}{% endif %}</h2>
+  <ul class="result-list">
+    {% for o in results %}
+    {% set chosen = selected.get((kind, None if kind == 'AIR' else stop.id)) %}
+    <li class="result-card{{ '' if o.in_policy else ' is-out-of-policy' }}">
+      <div class="result-main">
+        <h3>{{ o.title }}</h3>
+        {{ tv.vendor_head(o) }}
+        <ul class="result-details">{% for d in o.details %}<li>{{ d }}</li>{% endfor %}</ul>
+        <p class="result-tags">
+          {% if o.in_policy %}<span class="tag tag-approved">In policy</span>{% else %}<span class="tag tag-returned">Out of policy</span> <span class="muted">{{ o.policy_reason }}</span>{% endif %}
+          {% for b in o.badges %}<span class="tag tag-routing">{{ b }}</span>{% endfor %}
+        </p>
+      </div>
+      <div class="result-price">
+        <p><strong class="price">{{ o.total|money }}</strong><br>
+          <span class="muted">{% if kind == 'AIR' %}{{ 'round trip' if values.depart != values['return'] else 'one way' }}{% elif kind == 'LODGING' %}{{ o.unit_price|money }} a night, {{ o.units }} night{{ '' if o.units == 1 else 's' }}{% else %}{{ o.unit_price|money }} a day, {{ o.units }} day{{ '' if o.units == 1 else 's' }}{% endif %}</span></p>
+        {% if chosen and chosen.title == o.title and chosen.amount == o.total %}
+        <p><span class="tag tag-approved">Your selection</span></p>
+        {% else %}
+        <form method="post">
+          {{ m.csrf() }}
+          <input type="hidden" name="action" value="select"><input type="hidden" name="kind" value="{{ kind }}">
+          <input type="hidden" name="option_id" value="{{ o.id }}"><input type="hidden" name="stop_id" value="{{ values.stop_id }}">
+          {% if kind == 'AIR' %}<input type="hidden" name="origin" value="{{ values.origin }}"><input type="hidden" name="depart" value="{{ values.depart }}"><input type="hidden" name="return" value="{{ values['return'] }}">{% endif %}
+          <button type="submit" class="btn {{ 'btn-primary' if o.in_policy else 'btn-secondary' }}">{{ 'Replace with this' if chosen else 'Select' }}<span class="sr-only"> {{ o.title }}, {{ o.total|money }}</span></button>
+        </form>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+{% elif kind == 'AIR' and not values.origin %}
+<p>Enter where you are departing from to see flights.</p>
+{% elif not errors %}
+<p>No {{ kind_label }} match. {% if in_policy_only %}Try showing out-of-policy options too.{% endif %}</p>
+{% endif %}
+{% endif %}
+{% endif %}
+
+<div class="button-row">
+  <a class="btn btn-primary" href="{{ url_for('documents.expenses', doc_id=doc.id) }}">Continue to expenses</a>
+  <a class="btn btn-secondary" href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Back to itinerary</a>
+</div>
+{% endblock %}

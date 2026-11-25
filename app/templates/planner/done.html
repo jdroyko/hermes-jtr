@@ -1,0 +1,26 @@
+{% extends "planner/_layout.html" %}
+{% block title %}Plan a trip: Review your trip{% endblock %}
+{% block screen %}
+<h1>Review your trip</h1>
+<section aria-labelledby="trip-title" class="card">
+  <h2 id="trip-title">{{ doc.trip_description }}</h2>
+  <dl class="summary-list">
+    <div><dt>Document</dt><dd>{{ doc.doc_number }} ({{ doc_label(doc) }})</dd></div>
+    <div><dt>Where</dt><dd>{{ stop.location }}, {{ stop.state }}{% if stop.location_text %} <span class="muted">(Standard {{ 'CONUS' if stop.rate_location == 'Standard CONUS' else 'OCONUS' }} rate)</span>{% endif %}</dd></div>
+    <div><dt>When</dt><dd>{{ doc.start_date|datefmt }} to {{ doc.end_date|datefmt }}</dd></div>
+    {% if comparison %}
+    <div><dt>Driving</dt><dd>{{ comparison.start_place }} to {{ comparison.destination }}, {{ '{:,.0f}'.format(comparison.round_trip_miles) }} miles round trip, {{ comparison.reimbursement|money }} reimbursement{% if comparison.airfare_estimate %} (flying: {{ comparison.airfare_estimate|money }}){% endif %}</dd></div>
+    {% endif %}
+    {% for s in selections %}
+    <div><dt>{{ TRAVEL_KINDS[s.kind] }}</dt><dd>{{ s.title }}, {{ s.amount|money }}{% if s.kind == 'LODGING' %} <span class="muted">(covered by your per diem lodging allowance)</span>{% endif %}</dd></div>
+    {% endfor %}
+    <div><dt>Per diem (lodging and M&amp;IE)</dt><dd>{{ per_diem.total|money }}</dd></div>
+    <div><dt>Transportation and other</dt><dd>{{ exp_total|money }}</dd></div>
+    <div><dt>Estimated total</dt><dd><strong>{{ total|money }}</strong></dd></div>
+  </dl>
+</section>
+<div class="button-row">
+  <a class="btn btn-primary btn-large" href="{{ url_for('documents.view', doc_id=doc.id) }}">Review and sign</a>
+  <a class="btn btn-secondary" href="{{ url_for('documents.trip', doc_id=doc.id) }}">Add purpose, funding and more details</a>
+</div>
+{% endblock %}

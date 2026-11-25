@@ -27,6 +27,7 @@ CREATE TABLE users (
     eft_last4                TEXT,
     default_routing_list_id  INTEGER REFERENCES routing_lists(id),
     active                   INTEGER NOT NULL DEFAULT 1,
+    theme                    TEXT NOT NULL DEFAULT 'cirrus',
     created_at               TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -167,8 +168,41 @@ CREATE TABLE documents (
     amendment         INTEGER NOT NULL DEFAULT 0,
     justification     TEXT NOT NULL DEFAULT '',
     total_estimate    REAL NOT NULL DEFAULT 0,
+    is_plan           INTEGER NOT NULL DEFAULT 0,   -- travel plan: sent to the travel agency once approved
+    is_template       INTEGER NOT NULL DEFAULT 0,   -- AO group plan: never routes, issued to travelers
+    template_id       INTEGER REFERENCES documents(id),
+    preapproved_by    INTEGER REFERENCES users(id), -- AO stamp applied automatically after funds verification
     created_at        TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at        TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE plan_assignees (
+    id           INTEGER PRIMARY KEY,
+    template_id  INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    user_id      INTEGER NOT NULL REFERENCES users(id),
+    document_id  INTEGER REFERENCES documents(id),
+    UNIQUE (template_id, user_id)
+);
+
+CREATE TABLE bookings (
+    id           INTEGER PRIMARY KEY,
+    document_id  INTEGER NOT NULL UNIQUE REFERENCES documents(id) ON DELETE CASCADE,
+    status       TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','BOOKED','CANCELLED')),
+    agent_id     INTEGER REFERENCES users(id),
+    notes        TEXT NOT NULL DEFAULT '',
+    created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+    booked_at    TEXT
+);
+
+CREATE TABLE booking_items (
+    id            INTEGER PRIMARY KEY,
+    booking_id    INTEGER NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+    kind          TEXT NOT NULL CHECK (kind IN ('AIR','LODGING','RENTAL_CAR','RAIL','OTHER')),
+    vendor        TEXT NOT NULL DEFAULT '',
+    confirmation  TEXT NOT NULL DEFAULT '',
+    amount        REAL NOT NULL DEFAULT 0,
+    details       TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE document_stops (
@@ -179,7 +213,9 @@ CREATE TABLE document_stops (
     depart_date     TEXT NOT NULL,
     lodging_nightly REAL,          -- actual nightly cost (voucher); NULL = use max
     gov_quarters    INTEGER NOT NULL DEFAULT 0,
-    sort_order      INTEGER NOT NULL DEFAULT 0
+    sort_order      INTEGER NOT NULL DEFAULT 0,
+    location_text   TEXT,          -- typed place with no rate of its own (rate_id = Standard CONUS/OCONUS)
+    location_state  TEXT
 );
 
 CREATE TABLE expenses (
@@ -231,3 +267,54 @@ CREATE INDEX idx_docs_org ON documents(org_id);
 CREATE INDEX idx_hist_doc ON document_history(document_id);
 CREATE INDEX idx_attach_expense ON attachments(expense_id);
 CREATE INDEX idx_attach_doc ON attachments(document_id);
+
+-- Flights, hotels and cars a traveler picked from the (demo) travel search.
+CREATE TABLE IF NOT EXISTS trip_selections (
+    id             INTEGER PRIMARY KEY,
+    document_id    INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    kind           TEXT NOT NULL CHECK (kind IN ('AIR', 'LODGING', 'RENTAL_CAR')),
+    stop_id        INTEGER REFERENCES document_stops(id) ON DELETE CASCADE,
+    vendor         TEXT NOT NULL,
+    title          TEXT NOT NULL,
+    details        TEXT NOT NULL DEFAULT '',
+    start_date     TEXT,
+    end_date       TEXT,
+    unit_price     REAL NOT NULL DEFAULT 0,
+    units          INTEGER NOT NULL DEFAULT 1,
+    amount         REAL NOT NULL DEFAULT 0,
+    in_policy      INTEGER NOT NULL DEFAULT 1,
+    policy_reason  TEXT NOT NULL DEFAULT '',
+    justification  TEXT NOT NULL DEFAULT '',
+    expense_id     INTEGER REFERENCES expenses(id) ON DELETE SET NULL,
+    created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Privately owned vehicle vs. airfare cost comparison saved by the trip planner.
+CREATE TABLE IF NOT EXISTS trip_comparisons (
+    id               INTEGER PRIMARY KEY,
+    document_id      INTEGER NOT NULL UNIQUE REFERENCES documents(id) ON DELETE CASCADE,
+    start_place      TEXT NOT NULL,
+    destination      TEXT NOT NULL,
+    one_way_miles    REAL NOT NULL,
+    round_trip_miles REAL NOT NULL,
+    distance_method  TEXT NOT NULL,
+    mileage_rate     REAL NOT NULL,
+    reimbursement    REAL NOT NULL,
+    mpg              REAL NOT NULL,
+    gas_price        REAL NOT NULL,
+    gas_cost         REAL NOT NULL,
+    origin_airport   TEXT,
+    dest_airport     TEXT,
+    airfare_estimate REAL,
+    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Frequent flyer, hotel and rental car loyalty memberships (last 4 digits only).
+CREATE TABLE IF NOT EXISTS user_memberships (
+    id            INTEGER PRIMARY KEY,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    program       TEXT NOT NULL,
+    member_last4  TEXT NOT NULL DEFAULT '',
+    created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (user_id, program)
+);

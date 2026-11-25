@@ -23,20 +23,20 @@ REPORTS = {
     "status": ("Document status by organization",
                "SELECT o.code AS org, d.doc_type AS type, d.status, COUNT(*) AS documents, "
                "ROUND(SUM(d.total_estimate),2) AS total FROM documents d JOIN orgs o ON o.id=d.org_id "
-               "WHERE {scope} GROUP BY o.code, d.doc_type, d.status ORDER BY o.code, d.doc_type, d.status"),
+               "WHERE {scope} AND d.is_template=0 GROUP BY o.code, d.doc_type, d.status ORDER BY o.code, d.doc_type, d.status"),
     "travelers": ("Travel by traveler",
                   "SELECT u.last_name || ', ' || u.first_name AS traveler, o.code AS org, COUNT(*) AS documents, "
                   "ROUND(SUM(CASE WHEN d.doc_type='AUTH' THEN d.total_estimate ELSE 0 END),2) AS authorized, "
                   "ROUND(SUM(CASE WHEN d.doc_type<>'AUTH' AND d.status='PAID' THEN d.total_estimate ELSE 0 END),2) AS paid "
                   "FROM documents d JOIN users u ON u.id=d.traveler_id JOIN orgs o ON o.id=d.org_id "
-                  "WHERE {scope} AND d.status<>'CANCELLED' GROUP BY u.id ORDER BY traveler"),
+                  "WHERE {scope} AND d.is_template=0 AND d.status<>'CANCELLED' GROUP BY u.id ORDER BY traveler"),
     "funds": ("Funds status by line of accounting",
               "SELECT l.label AS loa, l.code, l.fiscal_year AS fy, l.budget_amount AS budget, "
               "ROUND(COALESCE(SUM(CASE WHEN d.doc_type IN ('AUTH','LOCAL') AND d.status IN ('ROUTING','APPROVED','PAID') "
               "THEN d.total_estimate END),0),2) AS obligated, "
               "ROUND(l.budget_amount - COALESCE(SUM(CASE WHEN d.doc_type IN ('AUTH','LOCAL') AND d.status IN "
               "('ROUTING','APPROVED','PAID') THEN d.total_estimate END),0),2) AS available "
-              "FROM loas l LEFT JOIN documents d ON d.loa_id=l.id WHERE {scope_loa} GROUP BY l.id ORDER BY l.label"),
+              "FROM loas l LEFT JOIN documents d ON d.loa_id=l.id AND d.is_template=0 WHERE {scope_loa} GROUP BY l.id ORDER BY l.label"),
     "aging": ("Documents awaiting action (oldest first)",
               "SELECT d.doc_number AS document, d.doc_type AS type, o.code AS org, d.current_step_seq AS step, "
               "d.updated_at AS since, ROUND(julianday('now') - julianday(d.updated_at),1) AS days_waiting "

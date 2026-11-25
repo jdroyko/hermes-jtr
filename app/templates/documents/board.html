@@ -19,7 +19,7 @@
           <a href="{{ url_for('documents.view', doc_id=doc.id) }}">{{ doc.doc_number }}</a>
           {{ m.status_tag(doc.status, STATUS_LABELS) }}
         </div>
-        <p class="muted">{{ doc.first_name }} {{ doc.last_name }} &middot; {{ DOC_TYPE_LABELS.get(doc.doc_type, doc.doc_type) }}</p>
+        <p class="muted">{{ doc.first_name }} {{ doc.last_name }} &middot; {{ doc_label(doc) }}</p>
         <p>{{ doc.trip_purpose }}: {{ doc.trip_description }}</p>
         {% set ctx = card_context[doc.id] %}
         <details>

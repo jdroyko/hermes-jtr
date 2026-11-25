@@ -1,0 +1,20 @@
+{% extends "planner/_layout.html" %}
+{% block title %}Plan a trip: Where are you going?{% endblock %}
+{% block screen %}
+<h1>Where are you going?</h1>
+{{ m.error_summary(errors) }}
+<form method="post" novalidate class="planner-card">
+  {{ m.csrf() }}
+  {{ m.input('destination', 'City, state or base', values.destination, errors, required=True,
+     hint='Type any place, like San Diego, CA, Fort Riley, KS or Ramstein AB, Germany. It sets your per diem rate and is used to find flights and hotels.',
+     attrs='list="destination-options" autocomplete="off"') }}
+  <datalist id="destination-options">
+    {% for l in locations %}<option value="{{ l.location }}, {{ l.state }}"></option>{% endfor %}
+  </datalist>
+  {% if need_state %}
+  {{ m.input('new_state', 'State or country', values.new_state, errors, width='md', hint='We need this to choose the right per diem rate.') }}
+  {% endif %}
+  <div class="button-row"><button type="submit" class="btn btn-primary btn-large">Next</button></div>
+</form>
+<p class="muted">Prefer the full form? <a href="{{ url_for('documents.new', type='PLAN') }}">Plan a trip with the full form</a>.</p>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "planner/_layout.html" %}
+{% block title %}Plan a trip: Choose your flights{% endblock %}
+{% import "_travel.html" as tv with context %}
+{% block screen %}
+<h1>Choose your flights</h1>
+{{ m.error_summary(errors) }}
+<nav aria-label="Trip type" class="subnav search-tabs">
+  <ul>{% for key, label in trip_types %}<li><a href="{{ url_for('planner.fly', doc_id=doc.id, trip_type=key) }}" {% if key == values.trip_type %}aria-current="page"{% endif %}>{{ label }}</a></li>{% endfor %}</ul>
+</nav>
+<form method="get" novalidate class="planner-card">
+  <input type="hidden" name="searched" value="1"><input type="hidden" name="trip_type" value="{{ values.trip_type }}">
+  <datalist id="airport-options">{% for a in airports %}<option value="{{ a }}"></option>{% endfor %}</datalist>
+  {% set legs = 3 if values.trip_type == 'MULTI' else 1 %}
+  {% for i in range(legs) %}
+  <fieldset class="flight-leg">
+    <legend>{% if legs > 1 %}Flight {{ i + 1 }}{% if i == 2 %} <span class="optional">(optional)</span>{% endif %}{% else %}{{ 'Departing flight' if values.trip_type == 'ROUND' else 'Flight' }}{% endif %}</legend>
+    <div class="grid-3">
+      {{ m.input('from_%d' % i, 'From airport', values['from_%d' % i], errors, required=i < 2, hint='Code or city, like DAY.', attrs='list="airport-options" autocomplete="off"') }}
+      {{ m.input('to_%d' % i, 'To airport', values['to_%d' % i], errors, required=i < 2, attrs='list="airport-options" autocomplete="off"') }}
+      {{ m.input('date_%d' % i, 'Date', values['date_%d' % i], errors, type='date', required=i < 2) }}
+    </div>
+  </fieldset>
+  {% endfor %}
+  {% if values.trip_type == 'ROUND' %}
+  {{ m.input('return_date', 'Return date', values.return_date, errors, type='date', required=True) }}
+  {% endif %}
+  <div class="button-row"><button type="submit" class="btn btn-primary btn-large">Find flights</button></div>
+</form>
+
+{% if results %}
+<section aria-labelledby="results-title">
+  <h2 id="results-title">{{ results|length }} in-policy flights</h2>
+  <ul class="result-list">
+    {% for o in results %}
+    <li class="result-card">
+      <div class="result-main">
+        <h3>{{ o.title }}</h3>
+        {{ tv.vendor_head(o) }}
+        <ul class="result-details">{% for d in o.details %}<li>{{ d }}</li>{% endfor %}</ul>
+        <p class="result-tags"><span class="tag tag-approved">In policy</span>{% for b in o.badges %} <span class="tag tag-routing">{{ b }}</span>{% endfor %}</p>
+      </div>
+      <div class="result-price">
+        <p><strong class="price">{{ o.total|money }}</strong><br><span class="muted">{{ {'ROUND': 'round trip', 'ONE': 'one way', 'MULTI': 'all flights'}[values.trip_type] }}</span></p>
+        <form method="post">
+          {{ m.csrf() }}<input type="hidden" name="option_id" value="{{ o.id }}"><input type="hidden" name="searched" value="1">
+          {% for k, v in values.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+          <button type="submit" class="btn btn-primary">Choose<span class="sr-only"> {{ o.title }}, {{ o.total|money }}</span></button>
+        </form>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="muted">Need business class or another out-of-policy fare? Use the <a href="{{ url_for('travel.search', doc_id=doc.id, kind='AIR') }}">full flight search</a>, which asks for a justification.</p>
+</section>
+{% endif %}
+<p><a href="{{ url_for('planner.how', doc_id=doc.id) }}">Back to how you want to get there</a></p>
+{% endblock %}

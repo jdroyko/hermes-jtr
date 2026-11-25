@@ -1,0 +1,12 @@
+{% macro vendor_head(o) %}
+<div class="vendor-head">
+  {% for b in o.brands %}
+  <span class="vendor">
+    {% if b.logo in LOGOS %}<img class="vendor-logo" src="{{ url_for('static', filename='img/logos/' ~ LOGOS[b.logo]) }}" alt="">
+    {% else %}<span class="vendor-logo vendor-tone-{{ b.tone }}" aria-hidden="true">{{ b.mark }}</span>{% endif %}
+    <span class="vendor-name">{{ b.name }}</span>
+    {% if b.program and b.program in my_programs %}<span class="member-badge"><span aria-hidden="true">&#9733;</span> {{ PROGRAMS[b.program][1] }} member</span>{% endif %}
+  </span>
+  {% endfor %}
+</div>
+{% endmacro %}

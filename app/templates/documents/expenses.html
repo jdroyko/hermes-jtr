@@ -95,6 +95,7 @@
 
 <div class="button-row">
   <a class="btn btn-primary" href="{{ url_for('documents.view', doc_id=doc.id) }}">Continue to review</a>
-  {% if doc.doc_type != 'LOCAL' %}<a class="btn btn-secondary" href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Back to itinerary</a>{% endif %}
+  {% if doc.doc_type == 'AUTH' %}<a class="btn btn-secondary" href="{{ url_for('travel.search', doc_id=doc.id) }}">Back to flights, hotels and cars</a>
+  {% elif doc.doc_type != 'LOCAL' %}<a class="btn btn-secondary" href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Back to itinerary</a>{% endif %}
 </div>
 {% endblock %}

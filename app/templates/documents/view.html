@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% block title %}{{ doc.doc_number }}: {{ DOC_TYPE_LABELS[doc.doc_type] }}{% endblock %}
+{% block title %}{{ doc.doc_number }}: {{ doc_label(doc) }}{% endblock %}
 {% block content %}
 <div class="title-row">
-  <h1>{{ DOC_TYPE_LABELS[doc.doc_type] }} {{ doc.doc_number }}{% if doc.amendment %} <span class="muted">(amendment {{ doc.amendment }})</span>{% endif %}</h1>
+  <h1>{{ doc_label(doc) }} {{ doc.doc_number }}{% if doc.amendment %} <span class="muted">(amendment {{ doc.amendment }})</span>{% endif %}</h1>
   <p class="no-print"><a href="#" data-print>Print this document</a></p>
 </div>
 {% if editable %}{{ m.wizard(wizard_steps, 'review', doc) }}{% endif %}
@@ -19,6 +19,47 @@
   {% if voucher %}<div><dt>Voucher</dt><dd><a href="{{ url_for('documents.view', doc_id=voucher.id) }}">{{ voucher.doc_number }}</a></dd></div>{% endif %}
   {% if doc.justification %}<div><dt>Traveler justification</dt><dd>{{ doc.justification }}</dd></div>{% endif %}
 </dl>
+
+{% if doc.is_plan and not booking and doc.status not in ('APPROVED', 'PAID', 'CANCELLED') %}
+<p class="muted">This is a travel plan. Nothing is booked yet. Once your Approving Official approves it, it becomes your authorization and goes to the travel agency for booking.</p>
+{% endif %}
+{% if comparison %}
+<section aria-labelledby="cmp-title" class="card">
+  <h2 id="cmp-title">Personal vehicle compared with flying</h2>
+  <dl class="summary-list">
+    <div><dt>Route</dt><dd>{{ comparison.start_place }} to {{ comparison.destination }} and back, {{ '{:,.0f}'.format(comparison.round_trip_miles) }} miles ({{ 'entered by the traveler' if comparison.distance_method == 'entered' else 'estimated' }})</dd></div>
+    <div><dt>Mileage reimbursement</dt><dd>{{ comparison.reimbursement|money }} at {{ '$%.3f'|format(comparison.mileage_rate) }} a mile</dd></div>
+    <div><dt>Estimated gas cost</dt><dd>{{ comparison.gas_cost|money }} at {{ comparison.gas_price|money }} a gallon</dd></div>
+    <div><dt>Constructed airfare</dt><dd>{% if comparison.airfare_estimate %}{{ comparison.airfare_estimate|money }}, {{ comparison.origin_airport }} to {{ comparison.dest_airport }}{% else %}Not available{% endif %}</dd></div>
+  </dl>
+  {% if comparison.airfare_estimate and comparison.reimbursement > comparison.airfare_estimate %}<p><span class="tag tag-returned">Driving costs more</span> Reimbursement may be limited to the constructed airfare.</p>{% endif %}
+</section>
+{% endif %}
+{% if selections %}
+<section aria-labelledby="sel-title">
+  <h2 id="sel-title">Flights, hotels and cars selected</h2>
+  {% set sel_heading = 'Flights, hotels and cars selected' %}
+  {% include "documents/_selections.html" %}
+</section>
+{% endif %}
+{% if booking %}
+<section aria-labelledby="booking-title" class="card">
+  <h2 id="booking-title">Travel agency booking</h2>
+  <p>Status: <strong>{{ BOOKING_LABELS[booking.status] }}</strong>{% if booking.booked_at %} on {{ booking.booked_at|datefmt }}{% endif %}</p>
+  {% if booking_items %}
+  {% call m.table_wrap('Reservations') %}
+  <table class="table">
+    <caption class="sr-only">Reservations</caption>
+    <thead><tr><th scope="col">Type</th><th scope="col">Vendor</th><th scope="col">Confirmation</th><th scope="col">Details</th><th scope="col" class="num">Amount</th></tr></thead>
+    <tbody>
+    {% for i in booking_items %}<tr><td>{{ BOOKING_KINDS[i.kind] }}</td><td>{{ i.vendor }}</td><td>{{ i.confirmation }}</td><td>{{ i.details }}</td><td class="num">{{ i.amount|money }}</td></tr>{% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+  {% elif booking.status == 'PENDING' %}<p class="muted">The travel agency has not added reservations yet.</p>{% endif %}
+  {% if can('booking.view', doc.org_id) %}<p><a href="{{ url_for('agency.detail', booking_id=booking.id) }}">Open in the travel agency queue</a></p>{% endif %}
+</section>
+{% endif %}
 
 <section aria-labelledby="totals-title" class="card">
   <h2 id="totals-title">Cost summary</h2>
@@ -43,7 +84,7 @@
 <section aria-labelledby="itin-title">
   <h2 id="itin-title">Itinerary</h2>
   {% if stops %}
-  <ul>{% for s in stops %}<li>{{ s.location }}, {{ s.state }}{% if s.rate_status == 'pending' %} <span class="muted">(new &ndash; pending AO approval)</span>{% endif %}: {{ s.arrive_date|datefmt }} to {{ s.depart_date|datefmt }} ({{ s.nights }} night{{ '' if s.nights == 1 else 's' }}{% if s.gov_quarters %}, government quarters{% endif %})</li>{% endfor %}</ul>
+  <ul>{% for s in stops %}<li>{{ s.location }}, {{ s.state }}{% if s.location_text %} <span class="muted">(Standard {{ 'CONUS' if s.rate_location == 'Standard CONUS' else 'OCONUS' }} rate)</span>{% elif s.rate_status == 'pending' %} <span class="muted">(new &ndash; pending AO approval)</span>{% endif %}: {{ s.arrive_date|datefmt }} to {{ s.depart_date|datefmt }} ({{ s.nights }} night{{ '' if s.nights == 1 else 's' }}{% if s.gov_quarters %}, government quarters{% endif %})</li>{% endfor %}</ul>
   {% else %}<p>No TDY locations.</p>{% endif %}
   <h3>Per diem</h3>
   {% for n in per_diem.notes %}<p class="muted">{{ n }}</p>{% endfor %}

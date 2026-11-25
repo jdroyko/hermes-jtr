@@ -1,6 +1,9 @@
 {% extends "base.html" %}
 {% import "_macros.html" as m with context %}
-{% set heading = ('New ' ~ DOC_TYPE_LABELS[doc_type]|lower) if not doc else (doc.doc_number ~ ': Trip details') %}
+{% if doc %}{% set heading = doc.doc_number ~ ': Trip details' %}
+{% elif doc_type == 'PLAN' %}{% set heading = 'Plan a trip' %}
+{% elif doc_type == 'GROUP' %}{% set heading = 'New group travel plan' %}
+{% else %}{% set heading = 'New ' ~ DOC_TYPE_LABELS[doc_type]|lower %}{% endif %}
 {% block title %}{{ heading }}{% endblock %}
 {% block content %}
 <h1>{{ heading }}</h1>

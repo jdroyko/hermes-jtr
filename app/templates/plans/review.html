@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ doc.doc_number }}: Group travel plan{% endblock %}
+{% block content %}
+<h1>Group travel plan {{ doc.doc_number }}</h1>
+{% set draft = doc.status == 'CREATED' %}
+{% if draft %}{{ m.wizard(wizard_steps, 'review', doc) }}{% endif %}
+{{ m.error_summary(errors) }}
+
+<dl class="summary-list">
+  <div><dt>Status</dt><dd>{{ 'Draft' if draft else STATUS_LABELS[doc.status] }}</dd></div>
+  <div><dt>Purpose</dt><dd>{{ doc.trip_purpose }}: {{ doc.trip_description }}</dd></div>
+  <div><dt>Dates</dt><dd>{{ doc.start_date|datefmt }} to {{ doc.end_date|datefmt }}</dd></div>
+</dl>
+
+<section aria-labelledby="totals-title" class="card">
+  <h2 id="totals-title">Estimate per traveler</h2>
+  <dl class="summary-list">
+    <div><dt>Per diem (lodging and M&amp;IE)</dt><dd>{{ per_diem.total|money }}</dd></div>
+    <div><dt>Other expenses</dt><dd>{{ exp_total|money }}</dd></div>
+    <div><dt>Estimated total</dt><dd><strong>{{ total|money }}</strong></dd></div>
+  </dl>
+</section>
+
+<section aria-labelledby="itin-title">
+  <h2 id="itin-title">Itinerary</h2>
+  {% if stops %}
+  <ul>{% for s in stops %}<li>{{ s.location }}, {{ s.state }}: {{ s.arrive_date|datefmt }} to {{ s.depart_date|datefmt }} ({{ s.nights }} night{{ '' if s.nights == 1 else 's' }})</li>{% endfor %}</ul>
+  {% include "documents/_perdiem_table.html" %}
+  {% else %}<p>No TDY locations yet. {% if draft %}<a href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Add the itinerary</a>.{% endif %}</p>{% endif %}
+</section>
+
+{% if findings %}
+<section aria-labelledby="audit-title" class="card card-warn">
+  <h2 id="audit-title">Pre-audit flags ({{ findings|length }})</h2>
+  <ul>{% for f in findings %}<li><strong>{{ f.code }}</strong>: {{ f.message }} <span class="muted">({{ f.ref }})</span></li>{% endfor %}</ul>
+</section>
+{% endif %}
+
+{% if draft %}
+<section aria-labelledby="assign-title">
+  <h2 id="assign-title">Assign travelers</h2>
+  <form method="post" novalidate>
+    {{ m.csrf() }}
+    <fieldset id="travelers"{% if errors.travelers %} aria-describedby="travelers-error"{% endif %}>
+      <legend>Travelers who will receive this plan</legend>
+      {% if errors.travelers %}<p class="field-error" id="travelers-error"><span class="sr-only">Error:</span> {{ errors.travelers }}</p>{% endif %}
+      {% for c in candidates %}
+      {{ m.checkbox('traveler_id', c.last_name ~ ', ' ~ c.first_name ~ ' (' ~ c.rank_grade ~ ', ' ~ c.org_code ~ ')', c.id in selected, value=c.id, id='traveler-' ~ c.id) }}
+      {% else %}
+      <p>There is no one in your organizations to assign.</p>
+      {% endfor %}
+    </fieldset>
+    {% if findings %}
+    {{ m.textarea('justification', 'Justification for pre-audit flags', justification, errors, required=True, rows=3,
+       hint='This is copied to every traveler\'s authorization.') }}
+    {% endif %}
+    <p class="hint">Save as draft keeps your traveler list without creating anything. Save as Authorization creates
+      one authorization per traveler. Each goes to funds verification, and your approval is applied after that.</p>
+    <div class="button-row">
+      <button type="submit" name="action" value="issue" class="btn btn-primary">Save as Authorization</button>
+      <button type="submit" name="action" value="draft" class="btn btn-secondary">Save as draft</button>
+      <a href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Edit itinerary</a>
+      <a href="{{ url_for('documents.expenses', doc_id=doc.id) }}">Edit expenses</a>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+{% if issued %}
+<section aria-labelledby="issued-title">
+  <h2 id="issued-title">{{ 'Selected travelers' if draft else 'Issued authorizations' }}</h2>
+  {% call m.table_wrap('Travelers on this plan') %}
+  <table class="table">
+    <caption class="sr-only">Travelers on this plan</caption>
+    <thead><tr><th scope="col">Traveler</th><th scope="col">Authorization</th><th scope="col">Status</th></tr></thead>
+    <tbody>
+    {% for a in issued %}
+    <tr>
+      <th scope="row">{{ a.last_name }}, {{ a.first_name }}</th>
+      <td>{% if a.document_id %}<a href="{{ url_for('documents.view', doc_id=a.document_id) }}">{{ a.doc_number }}</a>{% else %}Not issued yet{% endif %}</td>
+      <td>{% if a.status %}{{ m.status_tag(a.status, STATUS_LABELS) }}{% else %}Draft{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+</section>
+{% endif %}
+<p><a href="{{ url_for('plans.index') }}">Back to group plans</a></p>
+{% endblock %}

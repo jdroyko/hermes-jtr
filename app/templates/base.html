@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </head>
-<body{% if g.user %} data-timeout="{{ session_timeout }}" data-csrf="{{ csrf_token }}" data-login="{{ url_for('auth.login') }}" data-extend="{{ url_for('auth.extend') }}"{% endif %}>
+<body class="theme-{{ g.user.theme if g.user and g.user.theme in THEMES else 'cirrus' }}"{% if g.user %} data-timeout="{{ session_timeout }}" data-csrf="{{ csrf_token }}" data-login="{{ url_for('auth.login') }}" data-extend="{{ url_for('auth.extend') }}"{% endif %}>
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <div class="proto-banner" role="note">
@@ -31,6 +31,15 @@
       {% if g.user %}
       <div class="user-menu">
         <span>Signed in as <strong>{{ g.user.first_name }} {{ g.user.last_name }}</strong></span>
+        {% set modern = g.user.theme == 'modern' %}
+        <form method="post" action="{{ url_for('main.theme_toggle') }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <input type="hidden" name="next" value="{{ request.full_path.rstrip('?') }}">
+          <button type="submit" class="btn btn-small design-toggle" aria-pressed="{{ 'false' if modern else 'true' }}">
+            <span class="design-toggle-track" aria-hidden="true"><span class="design-toggle-knob"></span></span>
+            508 accessible design: {{ 'Off' if modern else 'On' }}
+          </button>
+        </form>
         <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="btn btn-link">Sign out</button>
@@ -46,9 +55,13 @@
     <nav aria-label="Primary" class="sidebar" id="sidebar-nav">
       <ul>
         <li><a href="{{ url_for('main.home') }}" {% if ep == 'main.home' %}aria-current="page"{% endif %}>Home</a></li>
-        <li><a href="{{ url_for('documents.index') }}" {% if ep.startswith('documents.') and ep != 'documents.queue' %}aria-current="page"{% endif %}>Documents</a></li>
+        {% set planning = ep.startswith('planner.') or (ep == 'documents.new' and request.args.get('type') == 'PLAN') %}
+        {% if can('document.create.self') %}<li><a href="{{ url_for('planner.where') }}" {% if planning %}aria-current="page"{% endif %}>Plan a trip</a></li>{% endif %}
+        <li><a href="{{ url_for('documents.index') }}" {% if (ep.startswith('documents.') or ep.startswith('travel.')) and ep not in ('documents.queue', 'documents.board') and not planning %}aria-current="page"{% endif %}>Documents</a></li>
         <li><a href="{{ url_for('documents.queue') }}" {% if ep == 'documents.queue' %}aria-current="page"{% endif %}>Approvals</a></li>
         <li><a href="{{ url_for('documents.board') }}" {% if ep == 'documents.board' %}aria-current="page"{% endif %}>Approvals board</a></li>
+        {% if can('plan.assign') %}<li><a href="{{ url_for('plans.index') }}" {% if ep.startswith('plans.') %}aria-current="page"{% endif %}>Group plans</a></li>{% endif %}
+        {% if can('booking.view') %}<li><a href="{{ url_for('agency.index') }}" {% if ep.startswith('agency.') %}aria-current="page"{% endif %}>Travel agency</a></li>{% endif %}
         {% if can('reports.view') %}<li><a href="{{ url_for('reports.index') }}" {% if ep.startswith('reports.') %}aria-current="page"{% endif %}>Reports</a></li>{% endif %}
         <li><a href="{{ url_for('main.profile') }}" {% if ep == 'main.profile' %}aria-current="page"{% endif %}>My profile</a></li>
       </ul>

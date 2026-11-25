@@ -1,0 +1,18 @@
+{% extends "planner/_layout.html" %}
+{% block title %}Plan a trip: When are you traveling?{% endblock %}
+{% block screen %}
+<h1>When are you traveling?</h1>
+<p>Going to <strong>{{ destination }}</strong>. <a href="{{ url_for('planner.where') }}">Change</a></p>
+{{ m.error_summary(errors) }}
+<form method="post" novalidate class="planner-card">
+  {{ m.csrf() }}
+  <div class="grid-2">
+    {{ m.input('start_date', 'Leave date', values.start_date, errors, type='date', required=True) }}
+    {{ m.input('end_date', 'Return date', values.end_date, errors, type='date', required=True) }}
+  </div>
+  <div class="button-row">
+    <button type="submit" class="btn btn-primary btn-large">Next</button>
+    <a class="btn btn-secondary" href="{{ url_for('planner.where') }}">Back</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Booking for {{ doc.doc_number }}{% endblock %}
+{% block content %}
+<h1>Booking for {{ doc.doc_number }}</h1>
+{{ m.error_summary(errors) }}
+
+<dl class="summary-list">
+  <div><dt>Booking status</dt><dd><strong>{{ BOOKING_LABELS[booking.status] }}</strong>{% if booking.booked_at %} on {{ booking.booked_at|datefmt }}{% endif %}</dd></div>
+  <div><dt>Traveler</dt><dd>{{ traveler.first_name }} {{ traveler.last_name }}, {{ traveler.rank_grade }}. {{ traveler.email }}, {{ traveler.phone }}</dd></div>
+  <div><dt>Purpose</dt><dd>{{ doc.trip_purpose }}: {{ doc.trip_description }}</dd></div>
+  <div><dt>Dates</dt><dd>{{ doc.start_date|datefmt }} to {{ doc.end_date|datefmt }}</dd></div>
+  <div><dt>Approved estimate</dt><dd>{{ doc.total_estimate|money }}</dd></div>
+</dl>
+
+<section aria-labelledby="itin-title">
+  <h2 id="itin-title">Approved itinerary</h2>
+  {% if stops %}
+  <ul>{% for s in stops %}<li>{{ s.location }}, {{ s.state }}: {{ s.arrive_date|datefmt }} to {{ s.depart_date|datefmt }} ({{ s.nights }} night{{ '' if s.nights == 1 else 's' }}{% if s.gov_quarters %}, government quarters{% endif %})</li>{% endfor %}</ul>
+  {% else %}<p>No TDY locations.</p>{% endif %}
+  {% if expenses %}
+  <h3>Estimated transportation and other costs</h3>
+  <ul>{% for e in expenses %}<li>{{ CATEGORY_LABELS.get(e.category, e.category) }}{% if e.description %} ({{ e.description }}){% endif %}: {{ amount_of(e)|money }}</li>{% endfor %}</ul>
+  {% endif %}
+</section>
+
+{% if selections %}
+<section aria-labelledby="picks-title">
+  <h2 id="picks-title">Traveler's selections to book</h2>
+  <p>The traveler picked these from the travel search. Book these or the closest available match.</p>
+  {% set sel_heading = "Traveler's selections" %}
+  {% include "documents/_selections.html" %}
+</section>
+{% endif %}
+
+<section aria-labelledby="res-title">
+  <h2 id="res-title">Reservations</h2>
+  {% if items %}
+  {% call m.table_wrap('Reservations') %}
+  <table class="table">
+    <caption class="sr-only">Reservations</caption>
+    <thead><tr><th scope="col">Type</th><th scope="col">Vendor</th><th scope="col">Confirmation</th><th scope="col">Details</th><th scope="col" class="num">Amount</th>{% if manage and booking.status == 'PENDING' %}<th scope="col">Remove</th>{% endif %}</tr></thead>
+    <tbody>
+    {% for i in items %}
+    <tr>
+      <td>{{ BOOKING_KINDS[i.kind] }}</td><td>{{ i.vendor }}</td><td>{{ i.confirmation }}</td><td>{{ i.details }}</td><td class="num">{{ i.amount|money }}</td>
+      {% if manage and booking.status == 'PENDING' %}
+      <td><form method="post" class="inline">{{ m.csrf() }}<input type="hidden" name="action" value="delete_item"><input type="hidden" name="item_id" value="{{ i.id }}">
+        <button type="submit" class="btn btn-small btn-secondary">Remove<span class="sr-only"> {{ BOOKING_KINDS[i.kind] }} {{ i.confirmation }}</span></button></form></td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+  {% else %}<p>No reservations recorded yet.</p>{% endif %}
+</section>
+
+{% if manage and booking.status == 'PENDING' %}
+<section aria-labelledby="add-title" class="card">
+  <h2 id="add-title">Add a reservation</h2>
+  <form method="post" novalidate>
+    {{ m.csrf() }}
+    <input type="hidden" name="action" value="add_item">
+    {{ m.select('kind', 'Reservation type', kinds, values.kind, errors, required=True) }}
+    {{ m.input('vendor', 'Vendor', values.vendor, errors, required=True, hint='Airline, hotel, rental company or rail carrier.') }}
+    {{ m.input('confirmation', 'Confirmation number', values.confirmation, errors, required=True) }}
+    {{ m.input('amount', 'Amount', values.amount, errors, required=True, hint='Total cost in US dollars, like 425.80.', width='sm', attrs='inputmode="decimal"') }}
+    {{ m.textarea('details', 'Details', values.details, errors, rows=2, hint='Flight numbers, check-in dates, pick-up location.') }}
+    <div class="button-row"><button type="submit" class="btn btn-secondary">Add reservation</button></div>
+  </form>
+</section>
+<form method="post" class="button-row">
+  {{ m.csrf() }}
+  <input type="hidden" name="action" value="mark_booked">
+  <button type="submit" class="btn btn-primary">Mark booked</button>
+</form>
+{% elif manage and booking.status == 'BOOKED' %}
+<form method="post" class="button-row">
+  {{ m.csrf() }}
+  <input type="hidden" name="action" value="reopen">
+  <button type="submit" class="btn btn-secondary">Reopen to change reservations</button>
+</form>
+{% endif %}
+<p><a href="{{ url_for('agency.index') }}">Back to the travel agency queue</a> · <a href="{{ url_for('documents.view', doc_id=doc.id) }}">View the authorization</a></p>
+{% endblock %}

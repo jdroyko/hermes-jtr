@@ -27,21 +27,31 @@
       {% for k, v in STATUS_LABELS.items() %}<option value="{{ k }}" {% if k == status %}selected{% endif %}>{{ v }}</option>{% endfor %}
     </select>
   </div>
+  {% if sort %}<input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ direction }}">{% endif %}
   <button type="submit" class="btn btn-secondary">Apply filters</button>
 </form>
 
 <p role="status">{{ docs|length }} document{{ '' if docs|length == 1 else 's' }} found.</p>
+{% macro sort_th(key, label, cls='') %}
+  {% set active = sort == key %}
+  {% set nxt = 'desc' if (active and direction == 'asc') else 'asc' %}
+  <th scope="col"{% if cls %} class="{{ cls }}"{% endif %}{% if active %} aria-sort="{{ 'ascending' if direction == 'asc' else 'descending' }}"{% endif %}>
+    <a class="sort-link" href="{{ url_for('documents.index', scope=scope, type=doc_type or None, status=status or None, sort=key, dir=nxt) }}">{{ label }}<span class="sort-arrow" aria-hidden="true">{% if active %}{{ '▲' if direction == 'asc' else '▼' }}{% else %}↕{% endif %}</span><span class="sr-only">, sort {{ 'descending' if nxt == 'desc' else 'ascending' }}</span></a>
+  </th>
+{% endmacro %}
 {% if docs %}
 {% call m.table_wrap('Documents') %}
 <table class="table">
-  <caption class="sr-only">Documents matching the filters</caption>
-  <thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Traveler</th><th scope="col">Org</th><th scope="col">Trip</th><th scope="col">Dates</th><th scope="col">Status</th><th scope="col" class="num">Total</th></tr></thead>
+  <caption class="sr-only">Documents matching the filters{% if not status %}, cancelled documents hidden{% endif %}. Column headings are links that sort the table.</caption>
+  <thead><tr>
+    {{ sort_th('doc', 'Document') }}{{ sort_th('type', 'Type') }}{% if show_traveler %}{{ sort_th('traveler', 'Traveler') }}{% endif %}{{ sort_th('org', 'Org') }}{{ sort_th('trip', 'Trip') }}{{ sort_th('dates', 'Dates') }}{{ sort_th('status', 'Status') }}{{ sort_th('total', 'Total', 'num') }}
+  </tr></thead>
   <tbody>
   {% for d in docs %}
     <tr>
       <th scope="row"><a href="{{ url_for('documents.view', doc_id=d.id) }}">{{ d.doc_number }}</a>{% if d.amendment %} <span class="muted">(amendment {{ d.amendment }})</span>{% endif %}</th>
-      <td>{{ DOC_TYPE_LABELS[d.doc_type] }}</td>
-      <td>{{ d.last_name }}, {{ d.first_name }}</td>
+      <td>{{ doc_label(d) }}</td>
+      {% if show_traveler %}<td>{{ d.last_name }}, {{ d.first_name }}</td>{% endif %}
       <td>{{ d.org_code }}</td>
       <td>{{ d.trip_description }}</td>
       <td>{{ d.start_date|datefmt }} to {{ d.end_date|datefmt }}</td>

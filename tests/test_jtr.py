@@ -68,3 +68,17 @@ def test_preaudit_flags(app):
                  "receipt_attached": 0, "description": "", "expense_date": "2027-03-01"}]
         codes = {f["code"] for f in jtr.preaudit(doc, [], exps, {"lines": []})}
         assert {"NOLOA", "RECEIPT", "GTCC", "RENTAL"} <= codes
+
+
+def test_summary_groups_days_by_location(app):
+    with app.app_context():
+        r = jtr.compute_per_diem("2027-03-01", "2027-03-05",
+                                 [stop("San Diego", "CA", "2027-03-01", "2027-03-03"),
+                                  stop("San Antonio", "TX", "2027-03-03", "2027-03-05")], cfg=CFG)
+        g = r["summary"]
+        assert [x["location"] for x in g] == ["San Diego, CA", "San Antonio, TX"]
+        assert g[0]["days"] == 2 and g[1]["days"] == 3
+        assert (g[0]["lodging_max"], g[0]["lodging_day"], g[0]["mie_rate"], g[0]["mie_day"]) == (215, 215, 86, 86)
+        assert g[0]["start"] == "2027-03-01" and g[0]["end"] == "2027-03-02"
+        assert round(sum(x["lodging"] for x in g), 2) == r["lodging"]
+        assert round(sum(x["mie"] for x in g), 2) == r["mie"]

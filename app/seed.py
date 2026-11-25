@@ -33,11 +33,13 @@ USERS = [  # username, first, last, org, grade, roles [(role, org code or None, 
     ("budget", "Riley", "Patel", "HQ-W1", "GS-11", [("traveler", "HQ-W1", 0), ("budget_dta", "HQ-W1", 1)]),
     ("dta", "Drew", "Garcia", "HQ-W1", "GS-11", [("traveler", "HQ-W1", 0), ("org_dta", "HQ-W1", 1)]),
     ("auditor", "Sam", "Okafor", "HQ", "GS-14", [("auditor", "HQ", 1)]),
+    ("agent", "Avery", "Brooks", "HQ", "CTR", [("travel_agency", "HQ", 1)]),
 ]
 
 # Illustrative rates: location, state, season start, season end, lodging, M&IE
 RATES = [
     ("Standard CONUS", "US", "01-01", "12-31", 110, 68),
+    ("Standard OCONUS", "OCONUS", "01-01", "12-31", 150, 90),
     ("Washington, DC", "DC", "01-01", "06-30", 276, 92),
     ("Washington, DC", "DC", "07-01", "08-31", 197, 92),
     ("Washington, DC", "DC", "09-01", "12-31", 276, 92),

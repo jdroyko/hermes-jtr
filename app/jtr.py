@@ -56,6 +56,32 @@ TRIP_PURPOSES = [
     ("OTHER", "Other"),
 ]
 
+STANDARD_CONUS = "Standard CONUS"
+STANDARD_OCONUS = "Standard OCONUS"
+
+# JTR CONUS = the 48 contiguous states and DC; AK, HI and territories are OCONUS.
+CONUS_STATES = {
+    "AL": "Alabama", "AZ": "Arizona", "AR": "Arkansas", "CA": "California", "CO": "Colorado",
+    "CT": "Connecticut", "DE": "Delaware", "DC": "District of Columbia", "FL": "Florida", "GA": "Georgia",
+    "ID": "Idaho", "IL": "Illinois", "IN": "Indiana", "IA": "Iowa", "KS": "Kansas", "KY": "Kentucky",
+    "LA": "Louisiana", "ME": "Maine", "MD": "Maryland", "MA": "Massachusetts", "MI": "Michigan",
+    "MN": "Minnesota", "MS": "Mississippi", "MO": "Missouri", "MT": "Montana", "NE": "Nebraska",
+    "NV": "Nevada", "NH": "New Hampshire", "NJ": "New Jersey", "NM": "New Mexico", "NY": "New York",
+    "NC": "North Carolina", "ND": "North Dakota", "OH": "Ohio", "OK": "Oklahoma", "OR": "Oregon",
+    "PA": "Pennsylvania", "RI": "Rhode Island", "SC": "South Carolina", "SD": "South Dakota",
+    "TN": "Tennessee", "TX": "Texas", "UT": "Utah", "VT": "Vermont", "VA": "Virginia",
+    "WA": "Washington", "WV": "West Virginia", "WI": "Wisconsin", "WY": "Wyoming",
+}
+_CONUS_BY_NAME = {v.lower(): k for k, v in CONUS_STATES.items()}
+
+
+def conus_code(state):
+    """Two-letter code if ``state`` names a CONUS state or DC, else None."""
+    s = (state or "").strip()
+    if s.upper() in CONUS_STATES:
+        return s.upper()
+    return _CONUS_BY_NAME.get(s.lower())
+
 
 def parse(d):
     return d if isinstance(d, dt.date) else dt.date.fromisoformat(d)
@@ -134,7 +160,11 @@ def compute_per_diem(start, end, stops, actual=False, cfg=None):
         mie_stop = s or (stops[-1] if d == end else last_seen)
         if s:
             last_seen = s
-        rate = rate_for(mie_stop["location"], mie_stop["state"], d)
+        rate = rate_for(mie_stop.get("rate_location", mie_stop["location"]),
+                        mie_stop.get("rate_state", mie_stop["state"]), d)
+        label = "%s, %s" % (rate["location"], rate["state"])
+        if mie_stop.get("location_text"):
+            label = "%s, %s (%s rate)" % (mie_stop["location"], mie_stop["state"], rate["location"])
         pct_flat = ltdy_pct(mie_stop)
         if pct_flat < 100 and id(mie_stop) not in flagged_ltdy:
             flagged_ltdy.add(id(mie_stop))
@@ -155,7 +185,7 @@ def compute_per_diem(start, end, stops, actual=False, cfg=None):
         mie_pct = cfg["first_last_day_pct"] if travel_day else pct_flat
         mie = round(rate["mie"] * mie_pct / 100, 2)
         lines.append({
-            "date": d.isoformat(), "location": "%s, %s" % (rate["location"], rate["state"]),
+            "date": d.isoformat(), "location": label, "group": (label, rate["id"], pct_flat),
             "lodging_max": lodging_max,
             "lodging_claimed": (float(s["lodging_nightly"]) if s and s.get("lodging_nightly") is not None else None),
             "lodging": round(lodging, 2), "mie_rate": rate["mie"], "mie_pct": mie_pct, "mie": mie,
@@ -163,7 +193,28 @@ def compute_per_diem(start, end, stops, actual=False, cfg=None):
         })
     lodging_t = round(sum(x["lodging"] for x in lines), 2)
     mie_t = round(sum(x["mie"] for x in lines), 2)
-    return {"lines": lines, "lodging": lodging_t, "mie": mie_t, "total": round(lodging_t + mie_t, 2), "notes": notes}
+    return {"lines": lines, "summary": summarize(lines), "lodging": lodging_t, "mie": mie_t,
+            "total": round(lodging_t + mie_t, 2), "notes": notes}
+
+
+def summarize(lines):
+    """Collapse consecutive days at the same location and rate into one
+    group: the full-day rates, then the date range and totals."""
+    groups = []
+    for x in lines:
+        if not groups or groups[-1]["group"] != x["group"]:
+            groups.append({"group": x["group"], "location": x["location"], "start": x["date"], "days": 0,
+                           "lodging_max": 0.0, "lodging_day": 0.0, "mie_rate": x["mie_rate"], "mie_day": 0.0,
+                           "lodging": 0.0, "mie": 0.0})
+        g = groups[-1]
+        g["end"] = x["date"]
+        g["days"] += 1
+        g["lodging_max"] = max(g["lodging_max"], x["lodging_max"])
+        g["lodging_day"] = max(g["lodging_day"], x["lodging"])
+        g["mie_day"] = max(g["mie_day"], x["mie"])
+        g["lodging"] = round(g["lodging"] + x["lodging"], 2)
+        g["mie"] = round(g["mie"] + x["mie"], 2)
+    return groups
 
 
 def expense_amount(e, mileage_rate=None):

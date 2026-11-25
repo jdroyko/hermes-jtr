@@ -1,0 +1,26 @@
+{% extends "planner/_layout.html" %}
+{% block title %}Plan a trip: How do you want to get there?{% endblock %}
+{% block screen %}
+<h1>How do you want to get there?</h1>
+<p>{{ stop.location }}, {{ stop.state }}, {{ doc.start_date|datefmt }} to {{ doc.end_date|datefmt }}.</p>
+{{ m.error_summary(errors) }}
+<form method="post" novalidate class="planner-card">
+  {{ m.csrf() }}
+  <fieldset{% if errors %} class="has-error"{% endif %}>
+    <legend class="sr-only">How do you want to get there?</legend>
+    {% if errors %}<p class="field-error" id="mode-error"><span class="sr-only">Error:</span> {{ errors['mode-POV'] }}</p>{% endif %}
+    <div class="choice-tiles">
+      {% for key, label, hint in modes %}
+      <div class="choice-tile">
+        <input type="radio" name="mode" value="{{ key }}" id="mode-{{ key }}" aria-describedby="mode-{{ key }}-hint{% if errors %} mode-error{% endif %}">
+        <label for="mode-{{ key }}"><strong>{{ label }}</strong><span class="hint" id="mode-{{ key }}-hint">{{ hint }}</span></label>
+      </div>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <div class="button-row">
+    <button type="submit" class="btn btn-primary btn-large">Next</button>
+    <a class="btn btn-secondary" href="{{ url_for('documents.trip', doc_id=doc.id) }}">Edit trip details</a>
+  </div>
+</form>
+{% endblock %}

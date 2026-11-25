@@ -8,7 +8,8 @@
   <h2 id="start-title">Start a new document</h2>
   <ul class="action-list">
     {% if can('document.create.self') or can('document.create.others') %}
-    <li><a class="btn btn-primary" href="{{ url_for('documents.new', type='AUTH') }}">New authorization (TDY orders)</a></li>
+    <li><a class="btn btn-primary" href="{{ url_for('planner.where') }}">Plan a trip</a></li>
+    <li><a class="btn btn-secondary" href="{{ url_for('documents.new', type='AUTH') }}">New authorization (TDY orders)</a></li>
     <li><a class="btn btn-secondary" href="{{ url_for('documents.new', type='LOCAL') }}">New local voucher</a></li>
     {% endif %}
   </ul>
