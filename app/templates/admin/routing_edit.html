@@ -9,16 +9,28 @@
 {% call m.table_wrap('Routing steps') %}
 <table class="table">
   <caption class="sr-only">Routing steps</caption>
-  <thead><tr><th scope="col" class="num">Order</th><th scope="col">Step</th><th scope="col">Stamp</th><th scope="col">Required permission</th><th scope="col">Assigned to</th><th scope="col">Applies to</th><th scope="col">Remove</th></tr></thead>
-  <tbody>
+  <thead><tr><th scope="col"><span class="sr-only">Reorder</span></th><th scope="col" class="num">Order</th><th scope="col">Step</th><th scope="col">Stamp</th><th scope="col">Required permission</th><th scope="col">Assigned to</th><th scope="col">Applies to</th><th scope="col">Remove</th></tr></thead>
+  <tbody data-reorder-list data-reorder-url="{{ url_for('admin.routing_reorder', rl_id=rl.id) }}" data-reorder-field="step_id">
   {% for s in steps %}
-  <tr><td class="num">{{ s.seq }}</td><th scope="row">{{ s.name }}</th><td>{{ s.stamp }}</td><td><code>{{ s.required_permission }}</code></td>
+  <tr data-reorder-id="{{ s.id }}">
+    <td class="reorder-cell">
+      <div class="reorder-controls">
+        <form method="post" action="{{ url_for('admin.routing_reorder', rl_id=rl.id) }}" class="inline">{{ m.csrf() }}
+          <button type="submit" name="move_up" value="{{ s.id }}" class="btn btn-small btn-secondary" {% if loop.first %}disabled{% endif %}>
+            <span aria-hidden="true">&uarr;</span><span class="sr-only"> Move {{ s.name }} up</span></button></form>
+        <form method="post" action="{{ url_for('admin.routing_reorder', rl_id=rl.id) }}" class="inline">{{ m.csrf() }}
+          <button type="submit" name="move_down" value="{{ s.id }}" class="btn btn-small btn-secondary" {% if loop.last %}disabled{% endif %}>
+            <span aria-hidden="true">&darr;</span><span class="sr-only"> Move {{ s.name }} down</span></button></form>
+        <span class="drag-handle no-js-hide" draggable="true" aria-hidden="true" tabindex="-1">&#10495;</span>
+      </div>
+    </td>
+    <td class="num">{{ s.seq }}</td><th scope="row">{{ s.name }}</th><td>{{ s.stamp }}</td><td><code>{{ s.required_permission }}</code></td>
     <td>{{ s.username or 'Anyone with the permission' }}</td>
     <td>{% for t in s.doc_types.split(',') %}{{ DOC_TYPE_LABELS.get(t, t) }}{{ ', ' if not loop.last }}{% endfor %}</td>
     <td><form method="post" class="inline" data-confirm="Remove step {{ s.name }}?">{{ m.csrf() }}
       <input type="hidden" name="action" value="delete_step"><input type="hidden" name="step_id" value="{{ s.id }}">
       <button type="submit" class="btn btn-small btn-danger">Remove<span class="sr-only"> {{ s.name }}</span></button></form></td></tr>
-  {% else %}<tr><td colspan="7">No steps yet. Documents on this list cannot be signed.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="8">No steps yet. Documents on this list cannot be signed.</td></tr>{% endfor %}
   </tbody>
 </table>
 {% endcall %}

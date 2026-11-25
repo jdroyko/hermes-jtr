@@ -14,12 +14,23 @@ Add each place where you will stay overnight.</p>
 {% call m.table_wrap('TDY locations') %}
 <table class="table">
   <caption class="sr-only">TDY locations on this document</caption>
-  <thead><tr><th scope="col">Location</th><th scope="col">Arrive</th><th scope="col">Depart</th><th scope="col">Nights</th>
+  <thead><tr><th scope="col"><span class="sr-only">Reorder</span></th><th scope="col">Location</th><th scope="col">Arrive</th><th scope="col">Depart</th><th scope="col">Nights</th>
     <th scope="col">Lodging</th>{% if doc.doc_type != 'AUTH' %}<th scope="col">Actual nightly cost</th>{% endif %}<th scope="col">Remove</th></tr></thead>
-  <tbody>
+  <tbody data-reorder-list data-reorder-url="{{ url_for('documents.itinerary_reorder', doc_id=doc.id) }}" data-reorder-field="stop_id">
   {% for s in stops %}
-  <tr>
-    <th scope="row">{{ s.location }}, {{ s.state }}</th>
+  <tr data-reorder-id="{{ s.id }}">
+    <td class="reorder-cell">
+      <div class="reorder-controls">
+        <form method="post" action="{{ url_for('documents.itinerary_reorder', doc_id=doc.id) }}" class="inline">{{ m.csrf() }}
+          <button type="submit" name="move_up" value="{{ s.id }}" class="btn btn-small btn-secondary" {% if loop.first %}disabled{% endif %}>
+            <span aria-hidden="true">&uarr;</span><span class="sr-only"> Move {{ s.location }} up</span></button></form>
+        <form method="post" action="{{ url_for('documents.itinerary_reorder', doc_id=doc.id) }}" class="inline">{{ m.csrf() }}
+          <button type="submit" name="move_down" value="{{ s.id }}" class="btn btn-small btn-secondary" {% if loop.last %}disabled{% endif %}>
+            <span aria-hidden="true">&darr;</span><span class="sr-only"> Move {{ s.location }} down</span></button></form>
+        <span class="drag-handle no-js-hide" draggable="true" aria-hidden="true" tabindex="-1">&#10495;</span>
+      </div>
+    </td>
+    <th scope="row">{{ s.location }}, {{ s.state }}{% if s.rate_status == 'pending' %} <span class="muted">(new &ndash; pending AO approval)</span>{% endif %}</th>
     <td>{{ s.arrive_date|datefmt }}</td>
     <td>{{ s.depart_date|datefmt }}</td>
     <td>{{ s.nights }}</td>
@@ -58,9 +69,14 @@ Add each place where you will stay overnight.</p>
 <h2 id="add-title">Add a location</h2>
 <form method="post" novalidate>
   {{ m.csrf() }}<input type="hidden" name="action" value="add">
-  {% set loc_opts = [] %}{% for l in locations %}{% set _ = loc_opts.append((l.id, l.location ~ ', ' ~ l.state)) %}{% endfor %}
-  {{ m.select('rate_id', 'TDY location', loc_opts, values.rate_id, errors, required=True,
-     hint='If your location is not listed, choose Standard CONUS.') }}
+  {{ m.input('location_text', 'TDY location', values.location_text, errors, required=True,
+     hint="Start typing a city, base or installation. If it isn't listed, type its full name and also enter its state or country below.",
+     attrs='list="location-options" autocomplete="off"') }}
+  <datalist id="location-options">
+    {% for l in locations %}<option value="{{ l.location }}, {{ l.state }}"></option>{% endfor %}
+  </datalist>
+  {{ m.input('new_state', 'State or country (new locations only)', values.new_state, errors, width='sm',
+     hint='Only needed when the location above is not already in the suggestions.') }}
   <div class="grid-2">
     {{ m.input('arrive_date', 'Arrival date', values.arrive_date, errors, type='date', required=True) }}
     {{ m.input('depart_date', 'Departure date', values.depart_date, errors, type='date', required=True) }}

@@ -114,7 +114,7 @@ def check(html, url):
 
 PAGES = {
     None: ["/login", "/accessibility"],
-    "traveler": ["/", "/profile", "/documents/", "/documents/queue", "/documents/new?type=AUTH",
+    "traveler": ["/", "/profile", "/documents/", "/documents/queue", "/documents/board", "/documents/new?type=AUTH",
                  "/documents/new?type=LOCAL"],
     "admin": ["/admin/", "/admin/users", "/admin/users/new", "/admin/users/2", "/admin/users/2/profile",
               "/admin/roles", "/admin/roles/new", "/admin/roles/1", "/admin/roles/new?clone=1", "/admin/matrix",
@@ -140,7 +140,7 @@ def test_document_pages_a11y(as_user):
     r = t.post("/documents/new", data={"type": "AUTH", "traveler_id": "2", "trip_purpose": "TDY",
                                        "trip_description": "A11y trip", "start_date": s, "end_date": e})
     doc = int(re.search(r"/documents/(\d+)/", r.headers["Location"]).group(1))
-    t.post("/documents/%d/itinerary" % doc, data={"action": "add", "rate_id": "1", "arrive_date": s, "depart_date": e})
+    t.post("/documents/%d/itinerary" % doc, data={"action": "add", "location_text": "Standard CONUS, US", "arrive_date": s, "depart_date": e})
     t.post("/documents/%d/expenses" % doc, data={"action": "add", "expense_date": s, "category": "TAXI",
                                                  "amount": "30", "payment_method": "GTCC"})
     for url in ("/documents/%d" % doc, "/documents/%d/trip" % doc, "/documents/%d/itinerary" % doc,
@@ -148,6 +148,37 @@ def test_document_pages_a11y(as_user):
         resp = t.get(url)
         assert resp.status_code == 200
         check(resp.get_data(as_text=True), url)
+
+
+def test_board_a11y_with_cards(as_user):
+    """Exercise the kanban board with a non-empty 'needs my action' column,
+    so the per-card Actions disclosure (stamp form, remarks field) is
+    actually rendered and linted, not just the empty-state page."""
+    import datetime as dt
+    t = as_user("traveler")
+    s = (dt.date.today() + dt.timedelta(days=7)).isoformat()
+    e = (dt.date.today() + dt.timedelta(days=9)).isoformat()
+    r = t.post("/documents/new", data={"type": "AUTH", "traveler_id": "2", "trip_purpose": "TDY",
+                                       "trip_description": "Board a11y trip", "start_date": s, "end_date": e})
+    doc = int(re.search(r"/documents/(\d+)/", r.headers["Location"]).group(1))
+    t.post("/documents/%d/itinerary" % doc, data={"action": "add", "location_text": "Standard CONUS, US", "arrive_date": s, "depart_date": e})
+    t.post("/documents/%d/sign" % doc, data={"certify": "1"})
+
+    budget = as_user("budget")
+    resp = budget.get("/documents/board")
+    assert resp.status_code == 200
+    check(resp.get_data(as_text=True), "/documents/board (needs-action card)")
+
+    budget.post("/documents/%d/action" % doc, data={"action": "stamp"})
+    ao = as_user("ao")
+    resp = ao.get("/documents/board")
+    assert resp.status_code == 200
+    check(resp.get_data(as_text=True), "/documents/board (ao needs-action card)")
+
+    ao.post("/documents/%d/action" % doc, data={"action": "return", "remarks": "Fix the dates"})
+    resp = t.get("/documents/board")
+    assert resp.status_code == 200
+    check(resp.get_data(as_text=True), "/documents/board (returned card, signable)")
 
 
 def test_error_states_a11y(client, as_user):

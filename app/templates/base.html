@@ -15,12 +15,19 @@
     financial or Controlled Unclassified Information.
   </div>
 
-  <header class="site-header">
-    <div class="container header-inner">
-      <a class="brand" href="{{ url_for('main.home') }}">
-        <span class="brand-mark" aria-hidden="true">JTR</span>
-        <span>JTR Travel<span class="brand-sub">{{ org_name }}</span></span>
-      </a>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="topbar-start">
+        {% if g.user %}
+        <button type="button" class="btn sidebar-toggle" id="sidebar-toggle" aria-expanded="true" aria-controls="sidebar-nav">
+          <span aria-hidden="true">&#9776;</span><span class="sr-only">Toggle navigation</span>
+        </button>
+        {% endif %}
+        <a class="brand" href="{{ url_for('main.home') }}">
+          <span class="brand-mark" aria-hidden="true">JTR</span>
+          <span>JTR Travel<span class="brand-sub">{{ org_name }}</span></span>
+        </a>
+      </div>
       {% if g.user %}
       <div class="user-menu">
         <span>Signed in as <strong>{{ g.user.first_name }} {{ g.user.last_name }}</strong></span>
@@ -31,38 +38,49 @@
       </div>
       {% endif %}
     </div>
+  </header>
+
+  <div class="app-shell">
     {% if g.user %}
     {% set ep = request.endpoint or '' %}
-    <nav aria-label="Primary" class="primary-nav">
-      <ul class="container">
+    <nav aria-label="Primary" class="sidebar" id="sidebar-nav">
+      <ul>
         <li><a href="{{ url_for('main.home') }}" {% if ep == 'main.home' %}aria-current="page"{% endif %}>Home</a></li>
         <li><a href="{{ url_for('documents.index') }}" {% if ep.startswith('documents.') and ep != 'documents.queue' %}aria-current="page"{% endif %}>Documents</a></li>
         <li><a href="{{ url_for('documents.queue') }}" {% if ep == 'documents.queue' %}aria-current="page"{% endif %}>Approvals</a></li>
+        <li><a href="{{ url_for('documents.board') }}" {% if ep == 'documents.board' %}aria-current="page"{% endif %}>Approvals board</a></li>
         {% if can('reports.view') %}<li><a href="{{ url_for('reports.index') }}" {% if ep.startswith('reports.') %}aria-current="page"{% endif %}>Reports</a></li>{% endif %}
         <li><a href="{{ url_for('main.profile') }}" {% if ep == 'main.profile' %}aria-current="page"{% endif %}>My profile</a></li>
-        {% if can('admin.users') or can('admin.roles') or can('routing.manage') or can('loa.manage') or can('perdiem.manage') or can('admin.settings') or can('audit.view') or can('org.manage') or can('admin.sod') %}
-        <li><a href="{{ url_for('admin.index') }}" {% if ep.startswith('admin.') %}aria-current="page"{% endif %}>Administration</a></li>
-        {% endif %}
       </ul>
-    </nav>
-    {% endif %}
-  </header>
-
-  <main id="main-content" tabindex="-1" class="container">
-    {% block breadcrumbs %}{% endblock %}
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-      <div class="flashes">
-        {% for cat, msg in messages %}
-        <div class="alert alert-{{ cat }}" role="{{ 'alert' if cat == 'error' else 'status' }}">
-          <span class="alert-label">{{ {'error':'Error','success':'Success','info':'Note'}.get(cat, 'Note') }}:</span> {{ msg }}
-        </div>
-        {% endfor %}
+      {% if can('admin.users') or can('admin.roles') or can('routing.manage') or can('loa.manage') or can('perdiem.manage') or can('admin.settings') or can('audit.view') or can('org.manage') or can('admin.sod') %}
+      <div class="sidebar-group">
+        <p class="sidebar-group-title">Administration</p>
+        <ul>
+          <li><a href="{{ url_for('admin.index') }}" {% if ep.startswith('admin.') %}aria-current="page"{% endif %}>Administration</a></li>
+        </ul>
       </div>
       {% endif %}
-    {% endwith %}
-    {% block content %}{% endblock %}
-  </main>
+    </nav>
+    {% endif %}
+
+    <main id="main-content" tabindex="-1" class="main-area">
+      <div class="container">
+        {% block breadcrumbs %}{% endblock %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+          {% if messages %}
+          <div class="flashes">
+            {% for cat, msg in messages %}
+            <div class="alert alert-{{ cat }}" role="{{ 'alert' if cat == 'error' else 'status' }}">
+              <span class="alert-label">{{ {'error':'Error','success':'Success','info':'Note'}.get(cat, 'Note') }}:</span> {{ msg }}
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
 
   <footer class="site-footer">
     <div class="container">

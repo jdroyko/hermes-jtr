@@ -43,7 +43,7 @@
 <section aria-labelledby="itin-title">
   <h2 id="itin-title">Itinerary</h2>
   {% if stops %}
-  <ul>{% for s in stops %}<li>{{ s.location }}, {{ s.state }}: {{ s.arrive_date|datefmt }} to {{ s.depart_date|datefmt }} ({{ s.nights }} night{{ '' if s.nights == 1 else 's' }}{% if s.gov_quarters %}, government quarters{% endif %})</li>{% endfor %}</ul>
+  <ul>{% for s in stops %}<li>{{ s.location }}, {{ s.state }}{% if s.rate_status == 'pending' %} <span class="muted">(new &ndash; pending AO approval)</span>{% endif %}: {{ s.arrive_date|datefmt }} to {{ s.depart_date|datefmt }} ({{ s.nights }} night{{ '' if s.nights == 1 else 's' }}{% if s.gov_quarters %}, government quarters{% endif %})</li>{% endfor %}</ul>
   {% else %}<p>No TDY locations.</p>{% endif %}
   <h3>Per diem</h3>
   {% for n in per_diem.notes %}<p class="muted">{{ n }}</p>{% endfor %}
@@ -89,64 +89,7 @@
 
 <section aria-labelledby="actions-title" id="actions" class="card no-print">
   <h2 id="actions-title">Actions</h2>
-  {% set any_action = signable or can_act or returnable or overridable or cancellable or amendable or editable %}
-  {% if editable %}
-  <p><a href="{{ url_for('documents.trip', doc_id=doc.id) }}">Edit trip details</a>
-    {% if doc.doc_type != 'LOCAL' %} · <a href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Edit itinerary</a>{% endif %}
-    · <a href="{{ url_for('documents.expenses', doc_id=doc.id) }}">Edit expenses</a></p>
-  {% endif %}
-
-  {% if signable %}
-  <form method="post" action="{{ url_for('documents.sign', doc_id=doc.id) }}" id="sign" novalidate>
-    {{ m.csrf() }}
-    <h3>Sign and submit</h3>
-    {% if findings %}
-    {{ m.textarea('justification', 'Justification for pre-audit flags', doc.justification, None, required=True,
-       hint='Explain each flagged item listed above.') }}
-    {% endif %}
-    {{ m.checkbox('certify', ('I certify that this document is true and correct and that the travel is required for official business.' if own else 'I am signing on behalf of the traveler, who has reviewed and agrees with this document.'),
-       hint='Knowingly submitting a false claim is punishable under 18 U.S.C. 287 and 1001.') }}
-    <button type="submit" class="btn btn-primary">Sign and submit</button>
-  </form>
-  {% endif %}
-
-  {% if can_act %}
-  <form method="post" action="{{ url_for('documents.action', doc_id=doc.id) }}" novalidate>
-    {{ m.csrf() }}
-    <h3>{{ current_step.name }}</h3>
-    {{ m.textarea('remarks', 'Remarks', '', None, hint='Required to return the document. Optional when stamping.', rows=3) }}
-    <div class="button-row">
-      <button type="submit" name="action" value="stamp" class="btn btn-primary">Apply {{ current_step.stamp }} stamp</button>
-      {% if returnable %}<button type="submit" name="action" value="return" class="btn btn-secondary">Return to traveler</button>{% endif %}
-    </div>
-  </form>
-  {% elif doc.status == 'ROUTING' and act_reason and not own %}
-  <p class="muted">You cannot act on this document: {{ act_reason }}</p>
-  {% endif %}
-
-  {% if overridable %}
-  <details>
-    <summary>Override routing (administrators)</summary>
-    <form method="post" action="{{ url_for('documents.action', doc_id=doc.id) }}" novalidate>
-      {{ m.csrf() }}
-      <div class="field"><label for="override-remarks">Reason for override</label>
-        <textarea class="input" id="override-remarks" name="remarks" rows="2" required aria-required="true"></textarea></div>
-      <button type="submit" name="action" value="override" class="btn btn-danger">Skip current step</button>
-    </form>
-  </details>
-  {% endif %}
-
-  {% if amendable %}
-  <form method="post" action="{{ url_for('documents.action', doc_id=doc.id) }}" class="inline">
-    {{ m.csrf() }}<button type="submit" name="action" value="amend" class="btn btn-secondary">Amend authorization</button>
-  </form>
-  {% endif %}
-  {% if cancellable %}
-  <form method="post" action="{{ url_for('documents.action', doc_id=doc.id) }}" class="inline" data-confirm="Cancel this document? This cannot be undone.">
-    {{ m.csrf() }}<button type="submit" name="action" value="cancel" class="btn btn-danger">Cancel document</button>
-  </form>
-  {% endif %}
-  {% if not any_action %}<p>No actions are available to you for this document.</p>{% endif %}
+  {% include "documents/_actions.html" %}
 </section>
 
 <section aria-labelledby="hist-title">

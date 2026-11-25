@@ -131,7 +131,11 @@ CREATE TABLE per_diem_rates (
     season_end   TEXT NOT NULL DEFAULT '12-31',  -- MM-DD
     lodging      REAL NOT NULL,
     mie          REAL NOT NULL,
-    fiscal_year  INTEGER NOT NULL
+    fiscal_year  INTEGER NOT NULL,
+    status       TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'pending')),
+    requested_by INTEGER REFERENCES users(id),   -- traveler who typed a location not on the list
+    document_id  INTEGER REFERENCES documents(id),  -- the document that first proposed it
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE settings (
@@ -174,7 +178,8 @@ CREATE TABLE document_stops (
     arrive_date     TEXT NOT NULL,
     depart_date     TEXT NOT NULL,
     lodging_nightly REAL,          -- actual nightly cost (voucher); NULL = use max
-    gov_quarters    INTEGER NOT NULL DEFAULT 0
+    gov_quarters    INTEGER NOT NULL DEFAULT 0,
+    sort_order      INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE expenses (
@@ -187,6 +192,18 @@ CREATE TABLE expenses (
     miles            REAL,
     payment_method   TEXT NOT NULL DEFAULT 'GTCC',
     receipt_attached INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE attachments (
+    id           INTEGER PRIMARY KEY,
+    expense_id   INTEGER NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+    document_id  INTEGER NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    filename     TEXT NOT NULL,          -- original name, display only
+    stored_name  TEXT NOT NULL UNIQUE,   -- on-disk name under instance/uploads/<document_id>/
+    content_type TEXT NOT NULL DEFAULT '',
+    size_bytes   INTEGER NOT NULL DEFAULT 0,
+    uploaded_by  INTEGER REFERENCES users(id),
+    created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE document_history (
@@ -212,3 +229,5 @@ CREATE INDEX idx_assign_user ON role_assignments(user_id);
 CREATE INDEX idx_docs_traveler ON documents(traveler_id);
 CREATE INDEX idx_docs_org ON documents(org_id);
 CREATE INDEX idx_hist_doc ON document_history(document_id);
+CREATE INDEX idx_attach_expense ON attachments(expense_id);
+CREATE INDEX idx_attach_doc ON attachments(document_id);

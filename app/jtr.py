@@ -98,7 +98,11 @@ def compute_per_diem(start, end, stops, actual=False, cfg=None):
         "ltdy_pct_181": setting("ltdy_pct_181", 55, float),
     }
     start, end = parse(start), parse(end)
-    stops = sorted(stops, key=lambda s: s["arrive_date"])
+    # Display order follows the traveler's custom itinerary order when known
+    # (falls back to arrival date for callers/tests that don't set it); the
+    # per-night lookup below scans all stops regardless of order, so this
+    # only affects the order `lines` is reported in, not the totals.
+    stops = sorted(stops, key=lambda s: (s.get("sort_order", 0), s["arrive_date"]))
     lines, notes = [], []
     if not stops:
         return {"lines": [], "lodging": 0.0, "mie": 0.0, "total": 0.0, "notes": ["No TDY locations entered."]}

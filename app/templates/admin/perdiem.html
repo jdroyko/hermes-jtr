@@ -8,10 +8,12 @@
 {% call m.table_wrap('Per diem rates') %}
 <table class="table table-compact">
   <caption class="sr-only">Per diem rates by location and season</caption>
-  <thead><tr><th scope="col">Location</th><th scope="col">State</th><th scope="col">Season</th><th scope="col" class="num">Lodging</th><th scope="col" class="num">M&amp;IE</th><th scope="col">FY</th><th scope="col">Delete</th></tr></thead>
+  <thead><tr><th scope="col">Location</th><th scope="col">State</th><th scope="col">Status</th><th scope="col">Season</th><th scope="col" class="num">Lodging</th><th scope="col" class="num">M&amp;IE</th><th scope="col">FY</th><th scope="col">Delete</th></tr></thead>
   <tbody>
   {% for r in rates %}
-  <tr><th scope="row">{{ r.location }}</th><td>{{ r.state }}</td><td>{{ r.season_start }} to {{ r.season_end }}</td>
+  <tr><th scope="row">{{ r.location }}</th><td>{{ r.state }}</td>
+    <td>{% if r.status == 'pending' %}<span class="tag tag-routing">Pending AO approval</span>{% else %}<span class="tag tag-approved">Active</span>{% endif %}</td>
+    <td>{{ r.season_start }} to {{ r.season_end }}</td>
     <td class="num">{{ r.lodging|money }}</td><td class="num">{{ r.mie|money }}</td><td>{{ r.fiscal_year }}</td>
     <td><form method="post" class="inline" data-confirm="Delete this rate?">{{ m.csrf() }}<input type="hidden" name="action" value="delete"><input type="hidden" name="rate_id" value="{{ r.id }}">
       <button type="submit" class="btn btn-small btn-danger">Delete<span class="sr-only"> {{ r.location }} {{ r.season_start }}</span></button></form></td></tr>

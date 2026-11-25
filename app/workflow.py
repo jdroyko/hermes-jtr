@@ -130,6 +130,12 @@ def stamp(doc, user_id, remarks=""):
     db.execute("UPDATE documents SET status=?, current_step_seq=NULL, updated_at=datetime('now') WHERE id=?",
                (final, doc["id"]))
     log(doc["id"], user_id, "FINAL", final)
+    if final == "APPROVED":
+        # Any TDY location the traveler proposed on this document is approved
+        # along with the document itself -- no separate AO action needed.
+        db.execute(
+            "UPDATE per_diem_rates SET status='active' WHERE status='pending' AND id IN "
+            "(SELECT rate_id FROM document_stops WHERE document_id=?)", (doc["id"],))
     return "Stamped %s. Document is now %s." % (step["stamp"], STATUS_LABELS[final].lower())
 
 

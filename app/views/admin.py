@@ -479,6 +479,39 @@ def routing_edit(rl_id):
                            perms=perms, users=users)
 
 
+@bp.route("/routing/<int:rl_id>/reorder", methods=["POST"])
+def routing_reorder(rl_id):
+    db = get_db()
+    rl = db.execute("SELECT * FROM routing_lists WHERE id=?", (rl_id,)).fetchone()
+    if not rl:
+        abort(404)
+    need("routing.manage", rl["org_id"])
+    steps = db.execute("SELECT id, seq FROM routing_steps WHERE routing_list_id=? ORDER BY seq", (rl_id,)).fetchall()
+    ids_in_seq = [s["id"] for s in steps]
+
+    move_up, move_down = request.form.get("move_up"), request.form.get("move_down")
+    if move_up or move_down:
+        step_id = int(move_up or move_down)
+        if step_id not in ids_in_seq:
+            abort(400)
+        i = ids_in_seq.index(step_id)
+        j = i - 1 if move_up else i + 1
+        if 0 <= j < len(ids_in_seq):
+            ids_in_seq[i], ids_in_seq[j] = ids_in_seq[j], ids_in_seq[i]
+    else:
+        order = request.form.getlist("step_id")
+        if not order or {int(i) for i in order} != set(ids_in_seq):
+            abort(400)
+        ids_in_seq = [int(i) for i in order]
+
+    for i, step_id in enumerate(ids_in_seq, start=1):
+        db.execute("UPDATE routing_steps SET seq=? WHERE id=? AND routing_list_id=?", (i, step_id, rl_id))
+    audit(me(), "ROUTING_STEP_REORDER", "routing:%d" % rl_id)
+    db.commit()
+    flash("Step order updated.", "success")
+    return redirect(url_for("admin.routing_edit", rl_id=rl_id))
+
+
 # --------------------------------------------------------------------- orgs
 @bp.route("/orgs", methods=["GET", "POST"])
 def orgs():

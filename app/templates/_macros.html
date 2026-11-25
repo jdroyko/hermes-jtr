@@ -31,9 +31,20 @@
 <div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
   <label for="{{ name }}">{{ label }}{% if not required %} <span class="optional">(optional)</span>{% endif %}</label>
   {{ _hint_error(name, hint, errors) }}
+  {% if type == 'password' %}
+  <div class="password-field">
+    <input class="input{% if width %} w-{{ width }}{% endif %}" id="{{ name }}" name="{{ name }}" type="password"
+           value="{{ value if value is not none else '' }}"{% if required %} required aria-required="true"{% endif %}
+           {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}{{ _described(name, hint, errors) }} {{ attrs|safe }} data-password-input>
+    <button type="button" class="btn btn-link password-toggle no-js-hide" data-password-toggle aria-pressed="false">
+      Show <span class="sr-only">password</span>
+    </button>
+  </div>
+  {% else %}
   <input class="input{% if width %} w-{{ width }}{% endif %}" id="{{ name }}" name="{{ name }}" type="{{ type }}"
          value="{{ value if value is not none else '' }}"{% if required %} required aria-required="true"{% endif %}
          {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}{{ _described(name, hint, errors) }} {{ attrs|safe }}>
+  {% endif %}
 </div>
 {% endmacro %}
 
@@ -70,8 +81,23 @@
 
 {% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endmacro %}
 
+{% macro status_icon(status) %}
+{%- set s = status|lower -%}
+{%- if s in ('approved', 'paid') -%}
+<svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 16 16"><path d="M2 8.5l4 4 8-8.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif s == 'returned' -%}
+<svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 16 16"><path d="M10.5 3L4 8l6.5 5M4 8h9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif s == 'routing' -%}
+<svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 16 16"><path d="M8 2a6 6 0 1 1-5.6 4M2.2 2.5v3.3h3.3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+{%- elif s == 'cancelled' -%}
+<svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+{%- else -%}
+<svg aria-hidden="true" focusable="false" width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+{%- endif -%}
+{% endmacro %}
+
 {% macro status_tag(status, labels) %}
-<span class="tag tag-{{ status|lower }}">{{ labels.get(status, status) }}</span>
+<span class="tag tag-{{ status|lower }}">{{ status_icon(status) }}{{ labels.get(status, status) }}</span>
 {% endmacro %}
 
 {% macro wizard(steps, current, doc) %}

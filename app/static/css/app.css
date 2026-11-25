@@ -19,6 +19,26 @@
   --info-bg: #e7f6f8;
   --radius: 0.25rem;
   --max: 75rem;
+
+  /* Shell + design-system additions */
+  --sidebar-w: 16rem;
+  --topbar-h: 3.75rem;
+  --surface: #ffffff;
+  --surface-sunken: #f7f8fa;
+  --shadow-sm: 0 1px 2px rgba(16,24,40,0.06);
+  --shadow-md: 0 2px 8px rgba(16,24,40,0.08), 0 1px 2px rgba(16,24,40,0.06);
+  --shadow-lg: 0 8px 24px rgba(16,24,40,0.12);
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem;
+  --space-5: 1.5rem; --space-6: 2rem; --space-8: 3rem;
+  --radius-sm: 0.375rem; --radius-md: 0.625rem; --radius-lg: 1rem;
+
+  /* Status pill fill colors. Text label + border + icon always remain the
+     real carriers of meaning (WCAG 1.4.1) — these are a decorative layer. */
+  --tag-created-bg: #eef1f4;  --tag-created-fg: #3d4551;
+  --tag-routing-bg: #e8f0fc;  --tag-routing-fg: #1a4480;
+  --tag-returned-bg: #fdecec; --tag-returned-fg: #b50909;
+  --tag-approved-bg: #e6f4ea; --tag-approved-fg: #00692f;
+  --tag-cancelled-bg: #f0f0f0; --tag-cancelled-fg: #565c65;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -60,31 +80,43 @@ a:focus-visible, button:focus-visible { box-shadow: 0 0 0 5px #fff; }
   color: #fff; padding: 0.75rem 1rem; font-weight: 700; }
 .skip-link:focus { top: 0.5rem; color: #fff; }
 
-/* Banner & header */
+/* Banner & topbar */
 .proto-banner { background: var(--warn-bg); border-bottom: 2px solid var(--warn-line); padding: 0.5rem 1rem;
   font-size: 0.95rem; text-align: center; }
-.site-header { background: #162e51; color: #fff; }
-.header-inner { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;
-  padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.topbar { background: #162e51; color: #fff; }
+.topbar-inner { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;
+  min-height: var(--topbar-h); padding: 0.5rem 1rem; }
+.topbar-start { display: flex; align-items: center; gap: 0.75rem; min-width: 0; }
 .brand { color: #fff; text-decoration: none; display: flex; gap: 0.75rem; align-items: center;
   font-size: 1.35rem; font-weight: 700; }
 .brand:visited, .brand:hover { color: #fff; }
-.brand-mark { background: #fff; color: #162e51; border-radius: var(--radius); padding: 0.15rem 0.45rem;
+.brand-mark { background: #fff; color: #162e51; border-radius: var(--radius-sm); padding: 0.15rem 0.45rem;
   font-size: 1rem; letter-spacing: 0.05em; }
 .brand-sub { display: block; font-size: 0.9rem; font-weight: 400; }
 .user-menu { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
 .user-menu .btn-link { color: #fff; }
-.site-header :focus-visible { outline-color: #fff; box-shadow: none; }
+.topbar :focus-visible { outline-color: #fff; box-shadow: none; }
 
-.primary-nav { background: #1a4480; }
-.primary-nav ul { list-style: none; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 0.25rem; }
-.primary-nav a { display: block; color: #fff; text-decoration: none; padding: 0.75rem 0.9rem; font-weight: 600;
-  border-bottom: 4px solid transparent; }
-.primary-nav a:visited { color: #fff; }
-.primary-nav a:hover { border-bottom-color: #a1d3ff; }
-.primary-nav a[aria-current="page"] { border-bottom-color: #fff; }
+.sidebar-toggle { display: none; background: transparent; border: 2px solid transparent; color: #fff;
+  min-height: 2.75rem; min-width: 2.75rem; font-size: 1.1rem; padding: 0; }
+.sidebar-toggle:hover { background: rgba(255,255,255,0.1); }
 
-main { padding-bottom: 3rem; min-height: 60vh; }
+/* App shell: sidebar + main content, side by side on wider screens */
+.app-shell { display: flex; align-items: flex-start; }
+.sidebar { background: var(--surface); border-right: 1px solid var(--line-soft); width: var(--sidebar-w);
+  flex: none; padding: 1.25rem 0; }
+.sidebar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar a { display: block; color: var(--ink); text-decoration: none; padding: 0.75rem 1.25rem; font-weight: 600;
+  border-left: 4px solid transparent; }
+.sidebar a:visited { color: var(--ink); }
+.sidebar a:hover { background: var(--surface-sunken); }
+.sidebar a[aria-current="page"] { border-left-color: var(--primary); background: var(--info-bg); color: var(--primary-dark); }
+.sidebar-group { margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--line-soft); }
+.sidebar-group-title { margin: 0 1.25rem 0.25rem; font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.04em; color: var(--muted); }
+
+.main-area { flex: 1; min-width: 0; background: var(--surface-sunken); padding-bottom: var(--space-8); min-height: 60vh; }
+.main-area .container { padding-top: var(--space-5); }
 
 .site-footer { background: var(--bg-alt); border-top: 1px solid var(--line-soft); padding: 1.25rem 0; font-size: 0.95rem; }
 .footer-links { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; }
@@ -104,8 +136,8 @@ main { padding-bottom: 3rem; min-height: 60vh; }
 .wizard .current .step-num { border-color: #fff; }
 
 /* Cards, layout */
-.card { border: 1px solid var(--line-soft); border-left: 4px solid var(--primary); border-radius: var(--radius);
-  padding: 1rem 1.25rem; margin: 1.5rem 0; background: #fff; }
+.card { border: 1px solid var(--line-soft); border-left: 4px solid var(--primary); border-radius: var(--radius-md);
+  padding: 1.25rem 1.5rem; margin: 1.5rem 0; background: var(--surface); box-shadow: var(--shadow-sm); }
 .card > h2:first-child, .card > h3:first-child { margin-top: 0; }
 .card-warn { border-left-color: var(--warn-line); background: var(--warn-bg); }
 .card-grid { list-style: none; padding: 0; display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
@@ -133,6 +165,12 @@ fieldset.perm-group { border-top: 1px solid var(--line-soft); padding-top: 0.75r
   border: 2px solid var(--line); border-radius: 0; min-height: 2.75rem; }
 textarea.input { min-height: 5rem; }
 .input.w-sm { max-width: 9rem; } .input.w-md { max-width: 20rem; }
+.password-field { display: flex; align-items: stretch; max-width: 20rem; }
+.password-field .input { border-right: 0; }
+.password-field .password-toggle { border: 2px solid var(--line); border-left: 0; background: var(--bg-alt);
+  white-space: nowrap; text-decoration: none; min-width: 4.5rem; }
+.password-field .password-toggle:hover { background: #e8f1fa; }
+.password-field .password-toggle:focus-visible { outline: 3px solid var(--primary); outline-offset: -3px; z-index: 1; }
 .has-error { border-left: 4px solid var(--danger); padding-left: 1rem; }
 .has-error .input, .input[aria-invalid="true"] { border-color: var(--danger); }
 .field-error { color: var(--danger); font-weight: 700; margin: 0 0 0.35rem; }
@@ -147,9 +185,9 @@ fieldset[disabled] .input { background: var(--bg-alt); }
 
 /* Buttons: minimum 44x44 target */
 .btn { display: inline-flex; align-items: center; justify-content: center; font: inherit; font-weight: 700;
-  padding: 0.6rem 1.2rem; min-height: 2.75rem; border-radius: var(--radius); border: 2px solid transparent;
+  padding: 0.6rem 1.2rem; min-height: 2.75rem; border-radius: var(--radius-md); border: 2px solid transparent;
   cursor: pointer; text-decoration: none; line-height: 1.2; }
-.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary { background: var(--primary); color: #fff; box-shadow: var(--shadow-sm); }
 .btn-primary:hover { background: var(--primary-dark); color: #fff; }
 .btn-primary:visited { color: #fff; }
 .btn-secondary { background: #fff; color: var(--primary); border-color: var(--primary); }
@@ -170,18 +208,22 @@ fieldset[disabled] .input { background: var(--bg-alt); }
 .error-summary a { color: var(--danger); font-weight: 700; }
 .error-summary:focus { outline: 3px solid var(--focus); outline-offset: 3px; }
 
-/* Tags: always text + border, never color alone */
-.tag { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 1rem; font-size: 0.875rem; font-weight: 700;
-  border: 2px solid currentColor; white-space: nowrap; }
-.tag-created { color: #3d4551; }
-.tag-routing { color: #1a4480; }
-.tag-returned { color: var(--danger); }
-.tag-approved, .tag-paid { color: var(--success); }
-.tag-cancelled { color: var(--muted); text-decoration: line-through; }
+/* Tags: text label + icon + border are the real carriers of meaning (WCAG
+   1.4.1) — the fill is a decorative layer on top, never load-bearing alone. */
+.tag { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border-radius: 1rem;
+  font-size: 0.875rem; font-weight: 700; border: 1px solid currentColor; white-space: nowrap; }
+.tag svg { flex-shrink: 0; }
+.tag-created { color: var(--tag-created-fg); background: var(--tag-created-bg); }
+.tag-routing { color: var(--tag-routing-fg); background: var(--tag-routing-bg); }
+.tag-returned { color: var(--tag-returned-fg); background: var(--tag-returned-bg); }
+.tag-approved, .tag-paid { color: var(--tag-approved-fg); background: var(--tag-approved-bg); }
+.tag-cancelled { color: var(--tag-cancelled-fg); background: var(--tag-cancelled-bg); text-decoration: line-through; }
 
 /* Tables */
-.table-wrap { overflow-x: auto; margin: 0 0 1.5rem; }
+.table-wrap { overflow-x: auto; margin: 0 0 1.5rem; border: 1px solid var(--line-soft); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm); background: var(--surface); }
 .table-wrap:focus-visible { outline: 3px solid var(--focus); }
+.table-wrap .table { margin: 0; }
 .table { border-collapse: collapse; width: 100%; font-size: 1rem; }
 .table caption { text-align: left; font-weight: 600; padding: 0.5rem 0; }
 .table th, .table td { border-bottom: 1px solid var(--line-soft); padding: 0.6rem 0.75rem; text-align: left; vertical-align: top; }
@@ -200,6 +242,16 @@ fieldset[disabled] .input { background: var(--bg-alt); }
 .summary-list dt { font-weight: 700; }
 .summary-list dd { margin: 0; }
 
+/* Drag-to-reorder lists (routing steps, itinerary stops). The handle is a
+   mouse/touch-only affordance (aria-hidden, not tabbable) -- the Up/Down
+   buttons beside it are the real, always-visible keyboard control. */
+.reorder-cell { width: 1%; white-space: nowrap; }
+.reorder-controls { display: flex; align-items: center; gap: 0.25rem; }
+.reorder-controls .btn-small { padding: 0.3rem 0.5rem; min-width: 2.25rem; }
+.drag-handle { cursor: grab; font-size: 1.1rem; color: var(--muted); padding: 0 0.25rem; user-select: none; }
+tr.drag-over { outline: 2px dashed var(--primary); outline-offset: -2px; }
+tr.dragging { opacity: 0.5; }
+
 /* Routing steps */
 .routing-steps { padding-left: 1.5rem; }
 .routing-steps li { margin-bottom: 0.5rem; }
@@ -213,6 +265,27 @@ fieldset[disabled] .input { background: var(--bg-alt); }
 
 details summary { cursor: pointer; font-weight: 600; padding: 0.5rem 0; }
 
+/* Receipt attachments */
+.attachment-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+.attachment-list li { padding: 0.35rem 0; border-bottom: 1px solid var(--line-soft); }
+.dropzone { border: 2px dashed var(--line); border-radius: var(--radius-md); padding: 1rem; max-width: 28rem; }
+.dropzone label { display: block; font-weight: 600; margin-bottom: 0.35rem; }
+.dropzone.drag-over { border-color: var(--primary); background: var(--info-bg); }
+
+/* Kanban approvals board */
+.board-status { min-height: 1.5rem; margin: 0.5rem 0 1rem; font-weight: 600; color: var(--primary-dark); }
+.kanban-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1.25rem; align-items: start; }
+.kanban-column h2 { font-size: 1.1rem; margin-top: 0; }
+.kanban-list { list-style: none; padding: 0; margin: 0; min-height: 3rem; border-radius: var(--radius-md);
+  background: var(--surface-sunken); padding: 0.5rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.kanban-list.drag-over { outline: 2px dashed var(--primary); outline-offset: -2px; background: var(--info-bg); }
+.kanban-card { background: var(--surface); border: 1px solid var(--line-soft); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm); padding: 0.75rem 0.9rem; cursor: grab; }
+.kanban-card.dragging { opacity: 0.5; }
+.kanban-card-head { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.kanban-card details { margin-top: 0.5rem; }
+.kanban-empty { background: none; box-shadow: none; border: none; padding: 0.5rem; }
+
 /* Dialog */
 dialog { border: 4px solid var(--ink); padding: 1.5rem; max-width: 32rem; width: calc(100% - 2rem); }
 dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
@@ -222,9 +295,17 @@ dialog h2 { margin-top: 0; }
 @media (max-width: 40rem) {
   h1 { font-size: 1.6rem; }
   .summary-list > div { grid-template-columns: 1fr; gap: 0.15rem; }
-  .primary-nav a { padding: 0.6rem 0.6rem; }
+  .sidebar a { padding: 0.6rem 1rem; }
   .btn { width: 100%; }
   .inline .btn, .inline-form .btn, .table .btn { width: auto; }
+
+  /* Sidebar stacks above content; a hamburger lets JS users collapse it,
+     but without JS (or before it is clicked) the nav is always fully
+     visible and reachable — collapsing is pure progressive enhancement. */
+  .sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; }
+  .app-shell { flex-direction: column; }
+  .sidebar { width: 100%; border-right: 0; border-bottom: 1px solid var(--line-soft); }
+  .sidebar.is-collapsed > ul, .sidebar.is-collapsed .sidebar-group { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -233,13 +314,17 @@ dialog h2 { margin-top: 0; }
 
 @media (forced-colors: active) {
   .tag, .btn, .wizard a { border: 2px solid CanvasText; }
+  .tag { background: Canvas; color: CanvasText; }
+  .sidebar a[aria-current="page"] { background: Highlight; color: HighlightText; }
   :focus-visible { outline: 3px solid Highlight; }
 }
 
 @media print {
-  .proto-banner, .primary-nav, .user-menu, .skip-link, .site-footer, .no-print, .wizard, form .btn, dialog { display: none !important; }
-  .site-header { background: none; color: #000; }
+  .proto-banner, .sidebar, .sidebar-toggle, .user-menu, .skip-link, .site-footer, .no-print, .wizard, form .btn, dialog { display: none !important; }
+  .topbar { background: none; color: #000; }
   .brand, .brand-mark { color: #000; }
   a { color: #000; text-decoration: none; }
-  .card { border: 1px solid #000; break-inside: avoid; }
+  .card, .table-wrap { border: 1px solid #000; box-shadow: none; break-inside: avoid; }
+  .tag { background: none !important; border: 1px solid #000 !important; color: #000 !important; }
+  .main-area { background: none; }
 }

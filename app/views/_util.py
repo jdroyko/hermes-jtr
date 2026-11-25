@@ -64,13 +64,19 @@ def can_amend(doc):
 def load_children(doc_id):
     db = get_db()
     stops = [dict(r) for r in db.execute(
-        "SELECT s.*, r.location, r.state FROM document_stops s JOIN per_diem_rates r ON r.id=s.rate_id "
-        "WHERE s.document_id=? ORDER BY s.arrive_date", (doc_id,))]
+        "SELECT s.*, r.location, r.state, r.status AS rate_status FROM document_stops s "
+        "JOIN per_diem_rates r ON r.id=s.rate_id WHERE s.document_id=? ORDER BY s.sort_order", (doc_id,))]
     for s in stops:
         s["nights"] = (dt.date.fromisoformat(s["depart_date"]) - dt.date.fromisoformat(s["arrive_date"])).days
     expenses = [dict(r) for r in db.execute(
         "SELECT * FROM expenses WHERE document_id=? ORDER BY expense_date, id", (doc_id,))]
     return stops, expenses
+
+
+def next_sort_order(doc_id):
+    row = get_db().execute("SELECT COALESCE(MAX(sort_order), -1) + 1 n FROM document_stops WHERE document_id=?",
+                           (doc_id,)).fetchone()
+    return row["n"]
 
 
 def recalc(doc_id):

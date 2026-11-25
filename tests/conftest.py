@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import tempfile
 
@@ -14,10 +15,13 @@ def app():
     fd, path = tempfile.mkstemp(suffix=".sqlite3")
     os.close(fd)
     os.remove(path)
-    app = create_app({"DATABASE": path, "TESTING": True, "TESTING_NO_CSRF": True, "SECRET_KEY": "test"})
+    upload_dir = tempfile.mkdtemp(suffix="-uploads")
+    app = create_app({"DATABASE": path, "TESTING": True, "TESTING_NO_CSRF": True, "SECRET_KEY": "test",
+                      "UPLOAD_FOLDER": upload_dir})
     yield app
     if os.path.exists(path):
         os.remove(path)
+    shutil.rmtree(upload_dir, ignore_errors=True)
 
 
 @pytest.fixture()

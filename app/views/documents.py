@@ -1,9 +1,9 @@
-from flask import Blueprint, abort, flash, g, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, g, jsonify, redirect, render_template, request, url_for
 
 from .. import jtr, rbac, workflow
 from ..db import audit, get_db
 from ._util import (Form, can_amend, can_cancel, can_edit, can_sign, get_doc, is_own, load_children, me,
-                    next_doc_number, recalc, travelers_for_preparer)
+                    next_doc_number, next_sort_order, recalc, travelers_for_preparer)
 
 bp = Blueprint("documents", __name__, url_prefix="/documents")
 
@@ -18,8 +18,33 @@ def _loas_for(org_id):
 
 
 def _locations():
-    return get_db().execute("SELECT MIN(id) id, location, state FROM per_diem_rates "
+    return get_db().execute("SELECT MIN(id) id, location, state FROM per_diem_rates WHERE status='active' "
                             "GROUP BY location, state ORDER BY location").fetchall()
+
+
+def _resolve_location(db, doc_id, location_text, new_state):
+    """Match a typed TDY location against existing rates (active or
+    pending, case-insensitive), or propose it as a new one. Returns
+    (rate_id, is_new, error)."""
+    location_text = (location_text or "").strip()
+    new_state = (new_state or "").strip()
+    loc, state = location_text, new_state
+    if not state and "," in location_text:
+        loc, state = (p.strip() for p in location_text.rsplit(",", 1))
+    if not loc:
+        return None, False, None  # caller already requires location_text
+    if not state:
+        return None, False, "Enter the state or country for this location, or pick one from the suggestions."
+    row = db.execute("SELECT id FROM per_diem_rates WHERE location=? COLLATE NOCASE AND state=? COLLATE NOCASE",
+                     (loc, state)).fetchone()
+    if row:
+        return row["id"], False, None
+    conus = db.execute("SELECT lodging, mie FROM per_diem_rates WHERE location='Standard CONUS' LIMIT 1").fetchone()
+    rid = db.execute(
+        "INSERT INTO per_diem_rates(location, state, lodging, mie, fiscal_year, status, requested_by, document_id)"
+        " VALUES (?,?,?,?,CAST(strftime('%Y','now') AS INTEGER),'pending',?,?)",
+        (loc, state.upper(), conus["lodging"], conus["mie"], me(), doc_id)).lastrowid
+    return rid, True, None
 
 
 # --------------------------------------------------------------------- list
@@ -62,6 +87,60 @@ def queue():
         u = db.execute("SELECT first_name, last_name FROM users WHERE id=?", (d["traveler_id"],)).fetchone()
         rows.append((d, step, u))
     return render_template("documents/queue.html", rows=rows)
+
+
+def _visible_docs(status_list):
+    """Documents in the given statuses that the current user may view,
+    mirroring index()'s own-or-org-scoped visibility rule."""
+    db = get_db()
+    where = ["d.status IN (%s)" % ",".join("?" * len(status_list))]
+    params = list(status_list)
+    org_clause = "(d.traveler_id=? OR d.created_by=?)"
+    org_params = [me(), me()]
+    if rbac.has_perm(me(), "document.view.org"):
+        orgs = rbac.scoped_org_ids(me(), "document.view.org")
+        if orgs is None:
+            org_clause = "1"
+            org_params = []
+        elif orgs:
+            org_clause = "(d.traveler_id=? OR d.created_by=? OR d.org_id IN (%s))" % (",".join("?" * len(orgs)))
+            org_params = [me(), me()] + list(orgs)
+    where.append(org_clause)
+    params += org_params
+    sql = ("SELECT d.*, u.first_name, u.last_name FROM documents d JOIN users u ON u.id=d.traveler_id "
+          "WHERE " + " AND ".join(where) + " ORDER BY d.updated_at DESC LIMIT 100")
+    return db.execute(sql, params).fetchall()
+
+
+def _card_context(doc):
+    stops, exps = load_children(doc["id"])
+    pd, _, _ = jtr.document_totals(doc, stops, exps)
+    findings = jtr.preaudit(doc, stops, exps, pd)
+    act_ok, act_reason, cur = workflow.can_act(me(), doc)
+    return dict(
+        doc=doc, findings=findings, current_step=cur, can_act=act_ok, act_reason=act_reason,
+        editable=can_edit(doc), signable=can_sign(doc), cancellable=can_cancel(doc),
+        amendable=can_amend(doc), returnable=workflow.can_return(me(), doc),
+        overridable=doc["status"] == "ROUTING" and rbac.has_perm(me(), "workflow.override", doc["org_id"]),
+        own=is_own(doc),
+    )
+
+
+@bp.route("/board")
+def board():
+    needs_action = [d for d, _step in workflow.queue_for(me())]
+    returned = _visible_docs(["RETURNED"])
+    approved = _visible_docs(["APPROVED", "PAID"])
+    columns = [
+        ("needs-action", "Needs my action", needs_action),
+        ("returned", "Returned", returned),
+        ("approved", "Approved / Paid", approved),
+    ]
+    card_context = {}
+    for _key, _label, docs in columns:
+        for d in docs:
+            card_context[d["id"]] = _card_context(d)
+    return render_template("documents/board.html", columns=columns, card_context=card_context)
 
 
 # ------------------------------------------------------------------- create
@@ -133,9 +212,9 @@ def create_voucher(doc_id):
         (next_doc_number("VOUCHER"), auth["traveler_id"], me(), auth["org_id"], auth["trip_purpose"],
          auth["trip_description"], auth["start_date"], auth["end_date"], auth["loa_id"],
          auth["routing_list_id"], doc_id)).lastrowid
-    db.execute("INSERT INTO document_stops(document_id, rate_id, arrive_date, depart_date, gov_quarters) "
-               "SELECT ?, rate_id, arrive_date, depart_date, gov_quarters FROM document_stops WHERE document_id=?",
-               (vid, doc_id))
+    db.execute("INSERT INTO document_stops(document_id, rate_id, arrive_date, depart_date, gov_quarters, sort_order) "
+               "SELECT ?, rate_id, arrive_date, depart_date, gov_quarters, sort_order FROM document_stops "
+               "WHERE document_id=?", (vid, doc_id))
     db.execute("INSERT INTO expenses(document_id, expense_date, category, description, amount, miles, payment_method)"
                " SELECT ?, expense_date, category, description, amount, miles, payment_method FROM expenses "
                "WHERE document_id=?", (vid, doc_id))
@@ -189,8 +268,8 @@ def itinerary(doc_id):
     doc = get_doc(doc_id)
     _require_edit(doc)
     db = get_db()
-    errors, values = {}, {"rate_id": "", "arrive_date": doc["start_date"], "depart_date": doc["end_date"],
-                          "lodging_nightly": "", "gov_quarters": ""}
+    errors, values = {}, {"location_text": "", "new_state": "", "arrive_date": doc["start_date"],
+                          "depart_date": doc["end_date"], "lodging_nightly": "", "gov_quarters": ""}
     if request.method == "POST":
         action = request.form.get("action", "add")
         if action == "delete":
@@ -214,7 +293,7 @@ def itinerary(doc_id):
         else:
             f = Form(request.form)
             values.update({k: f.get(k) for k in values})
-            rid = f.required("rate_id", "TDY location")
+            location_text = f.required("location_text", "TDY location")
             a = f.date("arrive_date", "Arrival date")
             d = f.date("depart_date", "Departure date")
             if a and d:
@@ -224,19 +303,61 @@ def itinerary(doc_id):
                     f.errors["arrive_date"] = "Dates must fall within the trip dates (%s to %s)." % (
                         doc["start_date"], doc["end_date"])
             nightly = f.number("lodging_nightly", "Nightly lodging cost", required=False)
+            rid, is_new_location = None, False
+            if location_text:
+                rid, is_new_location, loc_error = _resolve_location(db, doc_id, location_text, values["new_state"])
+                if loc_error:
+                    f.errors["new_state"] = loc_error
             errors = f.errors
             if f.ok:
                 db.execute("INSERT INTO document_stops(document_id, rate_id, arrive_date, depart_date, "
-                           "lodging_nightly, gov_quarters) VALUES (?,?,?,?,?,?)",
-                           (doc_id, rid, a, d, nightly, 1 if values["gov_quarters"] else 0))
+                           "lodging_nightly, gov_quarters, sort_order) VALUES (?,?,?,?,?,?,?)",
+                           (doc_id, rid, a, d, nightly, 1 if values["gov_quarters"] else 0,
+                            next_sort_order(doc_id)))
                 recalc(doc_id)
                 db.commit()
-                flash("Location added.", "success")
+                if is_new_location:
+                    flash("Location added. '%s' is new and will need your Approving Official's approval."
+                         % location_text, "success")
+                else:
+                    flash("Location added.", "success")
                 return redirect(request.path)
     stops, expenses = load_children(doc_id)
     pd, _, _ = jtr.document_totals(doc, stops, expenses)
     return render_template("documents/itinerary.html", doc=doc, stops=stops, per_diem=pd, values=values,
                            errors=errors, locations=_locations(), steps=STEPS, current="itinerary")
+
+
+@bp.route("/<int:doc_id>/itinerary/reorder", methods=["POST"])
+def itinerary_reorder(doc_id):
+    doc = get_doc(doc_id)
+    _require_edit(doc)
+    db = get_db()
+    stops = db.execute("SELECT id, sort_order FROM document_stops WHERE document_id=? ORDER BY sort_order",
+                       (doc_id,)).fetchall()
+    ids_in_order = [s["id"] for s in stops]
+
+    move_up, move_down = request.form.get("move_up"), request.form.get("move_down")
+    if move_up or move_down:
+        stop_id = int(move_up or move_down)
+        if stop_id not in ids_in_order:
+            abort(400)
+        i = ids_in_order.index(stop_id)
+        j = i - 1 if move_up else i + 1
+        if 0 <= j < len(ids_in_order):
+            ids_in_order[i], ids_in_order[j] = ids_in_order[j], ids_in_order[i]
+    else:
+        order = request.form.getlist("stop_id")
+        if not order or {int(i) for i in order} != set(ids_in_order):
+            abort(400)
+        ids_in_order = [int(i) for i in order]
+
+    for i, stop_id in enumerate(ids_in_order):
+        db.execute("UPDATE document_stops SET sort_order=? WHERE id=? AND document_id=?", (i, stop_id, doc_id))
+    recalc(doc_id)
+    db.commit()
+    flash("Itinerary order updated.", "success")
+    return redirect(url_for("documents.itinerary", doc_id=doc_id))
 
 
 @bp.route("/<int:doc_id>/expenses", methods=["GET", "POST"])
@@ -278,6 +399,14 @@ def expenses(doc_id):
             flash("Expense added.", "success")
             return redirect(request.path)
     stops, exps = load_children(doc_id)
+    attachments_by_expense = {}
+    if exps:
+        ids = [e["id"] for e in exps]
+        for a in db.execute("SELECT * FROM attachments WHERE expense_id IN (%s) ORDER BY created_at"
+                            % ",".join("?" * len(ids)), ids):
+            attachments_by_expense.setdefault(a["expense_id"], []).append(dict(a))
+    for e in exps:
+        e["attachments"] = attachments_by_expense.get(e["id"], [])
     rate = float(get_db().execute("SELECT value FROM settings WHERE key='pov_mileage_rate'").fetchone()["value"])
     return render_template("documents/expenses.html", doc=doc, expenses=exps, values=values, errors=errors,
                            categories=jtr.EXPENSE_CATEGORIES, methods=jtr.PAYMENT_METHODS, mileage_rate=rate,
@@ -340,7 +469,7 @@ def sign(doc_id):
         errors.append("Confirm the certification statement to sign.")
     if errors:
         flash(" ".join(errors), "error")
-        return redirect(url_for("documents.view", doc_id=doc_id) + "#sign")
+        return redirect(url_for("documents.view", doc_id=doc_id) + "#sign-%d" % doc_id)
     db.execute("UPDATE documents SET justification=? WHERE id=?", (justification, doc_id))
     try:
         workflow.sign(doc, me())
@@ -360,6 +489,7 @@ def action(doc_id):
     db = get_db()
     act = request.form.get("action")
     remarks = request.form.get("remarks", "")
+    wants_json = request.headers.get("X-Requested-With") == "fetch"
     try:
         if act == "stamp":
             msg = workflow.stamp(doc, me(), remarks)
@@ -384,10 +514,15 @@ def action(doc_id):
         else:
             abort(400)
     except (PermissionError, ValueError) as exc:
+        if wants_json:
+            return jsonify(ok=False, error=str(exc)), 200
         flash(str(exc), "error")
         return redirect(url_for("documents.view", doc_id=doc_id) + "#actions")
     audit(me(), "DOC_" + act.upper(), "document:%d" % doc_id, remarks)
     db.commit()
+    if wants_json:
+        doc = get_doc(doc_id)
+        return jsonify(ok=True, message=msg, status=doc["status"])
     flash(msg, "success")
     if act in ("stamp", "return") and request.form.get("from") == "queue":
         return redirect(url_for("documents.queue"))

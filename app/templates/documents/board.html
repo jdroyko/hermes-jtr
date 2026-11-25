@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Approvals board{% endblock %}
+{% block content %}
+<h1>Approvals board</h1>
+<p>A visual view of documents awaiting action. Dragging a card is optional — every card's <strong>Actions</strong>
+  disclosure has the same controls as the document page, and works the same with or without a mouse.</p>
+<div id="board-status" role="status" aria-live="polite" class="board-status"></div>
+
+<div class="kanban-board">
+  {% for key, label, docs in columns %}
+  <section class="kanban-column" aria-labelledby="col-{{ key }}-title">
+    <h2 id="col-{{ key }}-title">{{ label }} <span class="muted">({{ docs|length }})</span></h2>
+    <ul class="kanban-list" data-kanban-dropzone data-column-key="{{ key }}">
+      {% for doc in docs %}
+      <li class="kanban-card" draggable="true" data-doc-id="{{ doc.id }}"
+          data-action-url="{{ url_for('documents.action', doc_id=doc.id) }}">
+        <div class="kanban-card-head">
+          <a href="{{ url_for('documents.view', doc_id=doc.id) }}">{{ doc.doc_number }}</a>
+          {{ m.status_tag(doc.status, STATUS_LABELS) }}
+        </div>
+        <p class="muted">{{ doc.first_name }} {{ doc.last_name }} &middot; {{ DOC_TYPE_LABELS.get(doc.doc_type, doc.doc_type) }}</p>
+        <p>{{ doc.trip_purpose }}: {{ doc.trip_description }}</p>
+        {% set ctx = card_context[doc.id] %}
+        <details>
+          <summary>Actions</summary>
+          {% with doc=ctx.doc, findings=ctx.findings, current_step=ctx.current_step, can_act=ctx.can_act,
+                  act_reason=ctx.act_reason, editable=ctx.editable, signable=ctx.signable,
+                  cancellable=ctx.cancellable, amendable=ctx.amendable, returnable=ctx.returnable,
+                  overridable=ctx.overridable, own=ctx.own %}
+          {% include "documents/_actions.html" %}
+          {% endwith %}
+        </details>
+      </li>
+      {% else %}
+      <li class="kanban-empty muted">None.</li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+</div>
+
+<dialog id="board-return-dialog" aria-labelledby="board-return-title" aria-describedby="board-return-desc">
+  <h2 id="board-return-title">Return to traveler</h2>
+  <p id="board-return-desc">Remarks are required so the traveler knows what to correct.</p>
+  <form id="board-return-form">
+    <div class="field">
+      <label for="board-return-remarks">Remarks</label>
+      <textarea class="input" id="board-return-remarks" name="remarks" rows="3" required aria-required="true"></textarea>
+    </div>
+    <div class="button-row">
+      <button type="submit" class="btn btn-primary">Return document</button>
+      <button type="button" class="btn btn-secondary" id="board-return-cancel">Cancel</button>
+    </div>
+  </form>
+</dialog>
+{% endblock %}

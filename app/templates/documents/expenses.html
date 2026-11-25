@@ -22,13 +22,43 @@
     <th scope="row">{{ CATEGORY_LABELS.get(e.category, e.category) }}</th>
     <td>{{ e.description }}{% if e.category == 'POV_MILEAGE' %} ({{ '%g'|format(e.miles) }} miles at {{ mileage_rate|money }} per mile){% endif %}</td>
     <td>{{ e.payment_method }}</td>
-    <td>{{ 'Attached' if e.receipt_attached else 'None' }}</td>
+    <td>{{ e.attachments|length }} attached</td>
     <td class="num">{{ amount_of(e)|money }}</td>
     <td>
       <form method="post" class="inline" data-confirm="Remove this expense?">
         {{ m.csrf() }}<input type="hidden" name="action" value="delete"><input type="hidden" name="expense_id" value="{{ e.id }}">
         <button type="submit" class="btn btn-small btn-danger">Remove<span class="sr-only"> {{ CATEGORY_LABELS.get(e.category) }} on {{ e.expense_date }}</span></button>
       </form>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="7">
+      <details>
+        <summary>Receipts for {{ CATEGORY_LABELS.get(e.category, e.category) }} on {{ e.expense_date|datefmt }} ({{ e.attachments|length }})</summary>
+        {% if e.attachments %}
+        <ul class="attachment-list">
+          {% for a in e.attachments %}
+          <li>
+            <a href="{{ url_for('attachments.download_attachment', doc_id=doc.id, attachment_id=a.id) }}">{{ a.filename }}</a>
+            ({{ (a.size_bytes / 1024)|round(1) }} KB)
+            <form method="post" action="{{ url_for('attachments.delete_attachment', doc_id=doc.id, attachment_id=a.id) }}"
+                  class="inline" data-confirm="Remove this receipt?">
+              {{ m.csrf() }}
+              <button type="submit" class="btn btn-small btn-danger">Remove<span class="sr-only"> {{ a.filename }}</span></button>
+            </form>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+        <form method="post" action="{{ url_for('attachments.upload_attachment', doc_id=doc.id, expense_id=e.id) }}"
+              enctype="multipart/form-data" class="dropzone" data-dropzone>
+          {{ m.csrf() }}
+          <label for="receipt_{{ e.id }}">Attach a receipt (PDF, JPG or PNG, up to 10 MB)</label>
+          <input class="input" type="file" id="receipt_{{ e.id }}" name="receipt" accept=".pdf,.jpg,.jpeg,.png">
+          <p class="hint" data-dropzone-hint>Drag a file here, or choose a file, then select Upload.</p>
+          <button type="submit" class="btn btn-small btn-secondary">Upload</button>
+        </form>
+      </details>
     </td>
   </tr>
   {% endfor %}

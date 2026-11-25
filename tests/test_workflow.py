@@ -20,10 +20,7 @@ def test_full_lifecycle(as_user):
                                        "loa_id": "2"})
     assert r.status_code == 302
     doc = _doc_id(r)
-    # find San Diego rate id
-    page = t.get("/documents/%d/itinerary" % doc).get_data(as_text=True)
-    rate_id = re.search(r'<option value="(\d+)" >San Diego', page).group(1)
-    assert t.post("/documents/%d/itinerary" % doc, data={"action": "add", "rate_id": rate_id,
+    assert t.post("/documents/%d/itinerary" % doc, data={"action": "add", "location_text": "San Diego, CA",
                                                          "arrive_date": s, "depart_date": e}).status_code == 302
     assert t.post("/documents/%d/expenses" % doc, data={"action": "add", "expense_date": s, "category": "AIRFARE",
                                                         "amount": "450", "payment_method": "CBA"}).status_code == 302

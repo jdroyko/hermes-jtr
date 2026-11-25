@@ -18,9 +18,13 @@ def create_app(test_config=None):
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("SECURE_COOKIES") == "1",
+        UPLOAD_FOLDER=os.path.join(app.instance_path, "uploads"),
+        MAX_CONTENT_LENGTH=10 * 1024 * 1024,
+        ALLOWED_UPLOAD_EXTENSIONS={".pdf", ".jpg", ".jpeg", ".png"},
     )
     if test_config:
         app.config.update(test_config)
+    os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
     app.teardown_appcontext(dbmod.close_db)
 
@@ -34,6 +38,7 @@ def create_app(test_config=None):
         if not os.path.exists(app.config["DATABASE"]):
             dbmod.init_db()
         else:
+            dbmod.migrate(dbmod.get_db())
             rbac.sync_catalog(dbmod.get_db())
 
     # ------------------------------------------------------------------ auth
@@ -118,8 +123,11 @@ def create_app(test_config=None):
                                         "Your roles do not grant access to this page. Contact your "
                                         "Defense Travel Administrator if you believe this is an error."))
     app.register_error_handler(404, err(404, "Page not found", "The page you requested does not exist."))
+    app.register_error_handler(413, err(413, "File too large",
+                                        "That file is larger than the 10 MB limit. Reduce the file size and "
+                                        "try again."))
 
-    from .views import auth, main, documents, admin, reports
-    for bp in (auth.bp, main.bp, documents.bp, admin.bp, reports.bp):
+    from .views import auth, main, documents, admin, reports, attachments
+    for bp in (auth.bp, main.bp, documents.bp, admin.bp, reports.bp, attachments.bp):
         app.register_blueprint(bp)
     return app
