@@ -1,0 +1,31 @@
+{% if per_diem.lines %}
+{% call m.table_wrap('Per diem by day') %}
+<table class="table table-compact">
+  <caption>Per diem by day. First and last travel days are paid at a reduced M&amp;IE rate.</caption>
+  <thead><tr>
+    <th scope="col">Date</th><th scope="col">M&amp;IE location</th>
+    <th scope="col" class="num">Lodging max</th>{% if doc.doc_type != 'AUTH' %}<th scope="col" class="num">Lodging claimed</th>{% endif %}
+    <th scope="col" class="num">Lodging allowed</th><th scope="col" class="num">M&amp;IE rate</th><th scope="col" class="num">M&amp;IE %</th>
+    <th scope="col" class="num">M&amp;IE allowed</th><th scope="col" class="num">Day total</th>
+  </tr></thead>
+  <tbody>
+  {% for l in per_diem.lines %}
+  <tr>
+    <th scope="row">{{ l.date|datefmt }}</th><td>{{ l.location }}</td>
+    <td class="num">{{ l.lodging_max|money }}</td>
+    {% if doc.doc_type != 'AUTH' %}<td class="num">{{ l.lodging_claimed|money if l.lodging_claimed is not none else 'Not entered' }}</td>{% endif %}
+    <td class="num">{{ l.lodging|money }}</td><td class="num">{{ l.mie_rate|money }}</td>
+    <td class="num">{{ '%g'|format(l.mie_pct) }}%</td><td class="num">{{ l.mie|money }}</td><td class="num">{{ l.total|money }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+  <tfoot><tr>
+    <th scope="row" colspan="{{ 4 if doc.doc_type != 'AUTH' else 3 }}">Per diem total</th>
+    <td class="num">{{ per_diem.lodging|money }}</td><td></td><td></td><td class="num">{{ per_diem.mie|money }}</td>
+    <td class="num"><strong>{{ per_diem.total|money }}</strong></td>
+  </tr></tfoot>
+</table>
+{% endcall %}
+{% else %}
+<p>No per diem is computed yet.</p>
+{% endif %}

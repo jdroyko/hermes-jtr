@@ -1,0 +1,4 @@
+<nav aria-label="Breadcrumb" class="breadcrumbs"><ol>
+  <li><a href="{{ url_for('admin.index') }}">Administration</a></li>
+  {% for href, label in crumbs %}{% if href %}<li><a href="{{ href }}">{{ label }}</a></li>{% else %}<li aria-current="page">{{ label }}</li>{% endif %}{% endfor %}
+</ol></nav>

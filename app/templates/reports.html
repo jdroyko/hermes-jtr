@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Reports: {{ title }}{% endblock %}
+{% block content %}
+<h1>Reports</h1>
+<nav aria-label="Reports" class="subnav"><ul>
+  {% for k, (t, _) in reports.items() %}<li><a href="{{ url_for('reports.index', r=k) }}" {% if k == key %}aria-current="page"{% endif %}>{{ t }}</a></li>{% endfor %}
+</ul></nav>
+<h2>{{ title }}</h2>
+<p>Showing data for the organizations in your reporting scope.
+{% if can('reports.export') %}<a href="{{ url_for('reports.index', r=key, format='csv') }}">Download as CSV<span class="sr-only">: {{ title }}</span></a>{% endif %}</p>
+{% if rows %}
+{% call m.table_wrap(title) %}
+<table class="table">
+  <caption class="sr-only">{{ title }}</caption>
+  <thead><tr>{% for c in cols %}<th scope="col">{{ c|replace('_', ' ')|capitalize }}</th>{% endfor %}</tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr>{% for c in cols %}{% if loop.first %}<th scope="row">{{ r[c] }}</th>{% else %}<td{% if r[c] is number %} class="num"{% endif %}>{{ r[c] }}</td>{% endif %}{% endfor %}</tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% else %}<p>No data.</p>{% endif %}
+{% endblock %}

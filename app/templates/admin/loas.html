@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Lines of accounting{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(None, 'Lines of accounting')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Lines of accounting</h1>
+<p>Obligated amounts include authorizations and local vouchers that are in routing, approved or paid.</p>
+{% call m.table_wrap('Lines of accounting') %}
+<table class="table">
+  <caption class="sr-only">Lines of accounting and funds status</caption>
+  <thead><tr><th scope="col">Label</th><th scope="col">Org</th><th scope="col">Code</th><th scope="col">FY</th><th scope="col" class="num">Budget</th><th scope="col" class="num">Obligated</th><th scope="col" class="num">Available</th></tr></thead>
+  <tbody>
+  {% for l in loas %}
+  {% set avail = l.budget_amount - l.obligated %}
+  <tr><th scope="row">{{ l.label }}</th><td>{{ l.org_code }}</td><td><code>{{ l.code }}</code></td><td>{{ l.fiscal_year }}</td>
+    <td class="num">{{ l.budget_amount|money }}</td><td class="num">{{ l.obligated|money }}</td>
+    <td class="num">{{ avail|money }}{% if avail < 0 %} <span class="tag tag-returned">Over budget</span>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+<section aria-labelledby="add-loa" class="card">
+  <h2 id="add-loa">Add a line of accounting</h2>
+  {{ m.error_summary(errors) }}
+  <form method="post" novalidate>
+    {{ m.csrf() }}
+    {% set opts = [] %}{% for o in scoped %}{% set _ = opts.append((o.id, o.code ~ ' – ' ~ o.name)) %}{% endfor %}
+    {{ m.select('org_id', 'Organization', opts, values.org_id, errors, required=True) }}
+    {{ m.input('label', 'Label', values.label, errors, required=True) }}
+    {{ m.input('code', 'Accounting classification code', values.code, errors, required=True) }}
+    <div class="grid-2">
+      {{ m.input('fiscal_year', 'Fiscal year', values.fiscal_year, errors, required=True, width='sm', attrs='inputmode="numeric"') }}
+      {{ m.input('budget_amount', 'Budget, in dollars', values.budget_amount, errors, required=True, width='md', attrs='inputmode="decimal"') }}
+    </div>
+    <button type="submit" class="btn btn-primary">Add line of accounting</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Permission matrix{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(url_for('admin.roles'), 'Roles'), (None, 'Permission matrix')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Permission matrix</h1>
+<p>Rows are permissions and columns are roles. Every checkbox has a full label ("role: permission") for screen readers.
+If you prefer to edit one role at a time, use the <a href="{{ url_for('admin.roles') }}">role editor</a>.</p>
+<form method="post">
+  {{ m.csrf() }}
+  {% call m.table_wrap('Permission matrix, scrollable') %}
+  <table class="table table-compact matrix">
+    <caption class="sr-only">Permissions granted to each role</caption>
+    <thead><tr><th scope="col">Permission</th>
+      {% for r in roles %}<th scope="col" class="matrix-col"><a href="{{ url_for('admin.role_edit', role_id=r.id) }}">{{ r.name }}</a></th>{% endfor %}</tr></thead>
+    {% for cat, perms in groups.items() %}
+    <tbody>
+      <tr class="group-row"><th scope="rowgroup" colspan="{{ roles|length + 1 }}">{{ cat }}</th></tr>
+      {% for p in perms %}
+      <tr>
+        <th scope="row">{{ p.name }}<br><code class="muted">{{ p.key }}</code></th>
+        {% for r in roles %}
+        {% set cid = 'g-' ~ r.id ~ '-' ~ p.key|replace('.', '-') %}
+        <td class="center">
+          <input type="checkbox" id="{{ cid }}" name="grant" value="{{ r.id }}:{{ p.key }}" {% if (r.id, p.key) in have %}checked{% endif %}>
+          <label for="{{ cid }}" class="sr-only">{{ r.name }}: {{ p.name }}</label>
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+    {% endfor %}
+  </table>
+  {% endcall %}
+  <div class="sticky-actions"><button type="submit" class="btn btn-primary">Save matrix</button></div>
+</form>
+{% endblock %}

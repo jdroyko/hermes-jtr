@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% set heading = ('New ' ~ DOC_TYPE_LABELS[doc_type]|lower) if not doc else (doc.doc_number ~ ': Trip details') %}
+{% block title %}{{ heading }}{% endblock %}
+{% block content %}
+<h1>{{ heading }}</h1>
+{{ m.wizard(steps, current, doc) }}
+{{ m.error_summary(errors) }}
+<form method="post" novalidate>
+  {{ m.csrf() }}
+  <input type="hidden" name="type" value="{{ doc_type }}">
+  {% if travelers %}
+    {% if travelers|length > 1 %}
+    <div class="field{% if errors.traveler_id %} has-error{% endif %}">
+      <label for="traveler_id">Traveler</label>
+      <div class="hint" id="traveler_id-hint">You can prepare documents for travelers in your organizations.</div>
+      {% if errors.traveler_id %}<p class="field-error" id="traveler_id-error"><span class="sr-only">Error:</span> {{ errors.traveler_id }}</p>{% endif %}
+      <select class="input" id="traveler_id" name="traveler_id" aria-describedby="traveler_id-hint{% if errors.traveler_id %} traveler_id-error{% endif %}">
+        {% for t in travelers %}
+        <option value="{{ t.id }}" {% if t.id|string == values.traveler_id|string %}selected{% endif %}>{{ t.last_name }}, {{ t.first_name }}{% if t.id == g.user.id %} (me){% endif %}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <input type="hidden" name="traveler_id" value="{{ travelers[0].id }}">
+    {% endif %}
+  {% endif %}
+
+  {{ m.select('trip_purpose', 'Trip purpose', purposes, values.trip_purpose, errors, required=True) }}
+  {{ m.textarea('trip_description', 'Trip description', values.trip_description, errors, required=True,
+     hint='Describe the mission and why travel is needed. Approvers use this to decide whether the trip is necessary.', rows=3) }}
+
+  <fieldset>
+    <legend>Trip dates</legend>
+    <div class="grid-2">
+      {{ m.input('start_date', 'Start date', values.start_date, errors, type='date', required=True, hint='The day you leave your duty station or home. Format: YYYY-MM-DD') }}
+      {{ m.input('end_date', 'End date', values.end_date, errors, type='date', required=True, hint='The day you return. Format: YYYY-MM-DD') }}
+    </div>
+  </fieldset>
+
+  {% set loa_opts = [] %}{% for l in loas %}{% set _ = loa_opts.append((l.id, l.label ~ ' (' ~ l.code ~ ')')) %}{% endfor %}
+  {{ m.select('loa_id', 'Line of accounting', loa_opts, values.loa_id, errors, hint='The fund that pays for this trip. Ask your budget office if you are not sure.') }}
+
+  <div class="button-row">
+    <button type="submit" class="btn btn-primary">{{ 'Create and continue' if not doc else 'Save and continue' }}</button>
+    {% if doc %}<a class="btn btn-secondary" href="{{ url_for('documents.view', doc_id=doc.id) }}">Cancel</a>{% else %}<a class="btn btn-secondary" href="{{ url_for('main.home') }}">Cancel</a>{% endif %}
+  </div>
+</form>
+{% endblock %}

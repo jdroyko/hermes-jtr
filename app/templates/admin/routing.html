@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Routing lists{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(None, 'Routing lists')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Routing lists</h1>
+<p>A routing list is the ordered set of reviews and approvals a document must pass. Each step requires a permission.
+Anyone who holds that permission for the traveler's organization can act, unless the step is assigned to one person.
+Travelers use their default list, or the nearest list in their organization hierarchy.</p>
+{% call m.table_wrap('Routing lists') %}
+<table class="table">
+  <caption class="sr-only">Routing lists</caption>
+  <thead><tr><th scope="col">Name</th><th scope="col">Organization</th><th scope="col" class="num">Steps</th><th scope="col">Description</th></tr></thead>
+  <tbody>
+  {% for l in lists %}
+  <tr><th scope="row"><a href="{{ url_for('admin.routing_edit', rl_id=l.id) }}">{{ l.name }}</a></th><td>{{ l.code }}</td><td class="num">{{ l.n }}</td><td>{{ l.description }}</td></tr>
+  {% else %}<tr><td colspan="4">No routing lists.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+<section aria-labelledby="new-rl" class="card">
+  <h2 id="new-rl">Create a routing list</h2>
+  {{ m.error_summary(errors) }}
+  <form method="post" novalidate>
+    {{ m.csrf() }}
+    {{ m.input('name', 'Name', values.name, errors, required=True) }}
+    {% set opts = [] %}{% for o in orgs %}{% set _ = opts.append((o.id, o.code ~ ' – ' ~ o.name)) %}{% endfor %}
+    {{ m.select('org_id', 'Organization', opts, values.org_id, errors, required=True) }}
+    {{ m.textarea('description', 'Description', values.description, errors, rows=2) }}
+    <button type="submit" class="btn btn-primary">Create routing list</button>
+  </form>
+</section>
+{% endblock %}

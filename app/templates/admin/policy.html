@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Import and export policy{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(None, 'Import / export policy')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Import and export RBAC policy</h1>
+<p>The policy file contains roles, their permissions, custom permissions and separation-of-duties settings. It does
+not contain users or role assignments. Use it to version-control your policy, review changes, or copy it between
+environments.</p>
+<p><a class="btn btn-secondary" href="{{ url_for('admin.policy', download=1) }}">Download current policy (JSON)</a></p>
+
+{% if error %}<div class="alert alert-error" role="alert"><span class="alert-label">Error:</span> {{ error }}</div>{% endif %}
+<section aria-labelledby="import-title" class="card">
+<h2 id="import-title">Import a policy</h2>
+<form method="post" enctype="multipart/form-data">
+  {{ m.csrf() }}
+  <div class="field">
+    <label for="policy_file">Policy file <span class="optional">(optional)</span></label>
+    <div class="hint" id="policy_file-hint">A .json file exported from this or another environment.</div>
+    <input class="input" type="file" id="policy_file" name="policy_file" accept="application/json,.json" aria-describedby="policy_file-hint">
+  </div>
+  <div class="field">
+    <label for="policy">Or paste policy JSON</label>
+    <textarea class="input mono" id="policy" name="policy" rows="18" spellcheck="false">{{ policy }}</textarea>
+  </div>
+  {{ m.checkbox('replace', 'Delete roles that are not in the imported file',
+     hint='Leave unchecked to only add or update roles. Deleting a role also removes its assignments.') }}
+  <button type="submit" class="btn btn-primary">Import policy</button>
+</form>
+</section>
+{% endblock %}

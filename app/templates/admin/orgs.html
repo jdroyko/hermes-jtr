@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Organizations{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(None, 'Organizations')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Organizations</h1>
+<p>Role assignments scoped to an organization can also cover every organization below it.</p>
+<h2>Hierarchy</h2>
+<ul class="tree">
+{% for o, depth in tree %}
+  <li class="depth-{{ depth if depth < 6 else 6 }}"><span class="sr-only">Level {{ depth + 1 }}: </span><strong>{{ o.code }}</strong>, {{ o.name }}</li>
+{% endfor %}
+</ul>
+<section aria-labelledby="add-org" class="card">
+  <h2 id="add-org">Add an organization</h2>
+  {{ m.error_summary(errors) }}
+  <form method="post" novalidate>
+    {{ m.csrf() }}
+    {{ m.input('code', 'Org code', values.code, errors, required=True, width='md', hint='Short unique code, such as HQ-W1-S30.') }}
+    {{ m.input('name', 'Org name', values.name, errors, required=True) }}
+    {% set opts = [] %}{% for o in scoped %}{% set _ = opts.append((o.id, o.code ~ ' – ' ~ o.name)) %}{% endfor %}
+    {{ m.select('parent_id', 'Parent organization', opts, values.parent_id, errors, placeholder='None (top level)') }}
+    <button type="submit" class="btn btn-primary">Add organization</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}JTR and system settings{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(None, 'Settings')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>JTR and system settings</h1>
+{{ m.error_summary(errors) }}
+<form method="post" novalidate>
+  {{ m.csrf() }}
+  {% for r in rows %}
+  {{ m.input(r.key, r.key|replace('_', ' ')|capitalize, r.value, errors, required=True, hint=r.description, width='md') }}
+  {% endfor %}
+  <button type="submit" class="btn btn-primary">Save settings</button>
+</form>
+{% endblock %}

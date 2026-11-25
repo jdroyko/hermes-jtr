@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Roles{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(None, 'Roles')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<div class="title-row">
+  <h1>Roles</h1>
+  <p><a class="btn btn-primary" href="{{ url_for('admin.role_edit') }}">Create role</a>
+     <a class="btn btn-secondary" href="{{ url_for('admin.matrix') }}">Open permission matrix</a></p>
+</div>
+<p>A role is a named set of permissions. Every role, including the built-in roles, can be edited, cloned or deleted.
+Roles take effect when they are assigned to a user for an organization scope.</p>
+{% call m.table_wrap('Roles') %}
+<table class="table">
+  <caption class="sr-only">Roles</caption>
+  <thead><tr><th scope="col">Role</th><th scope="col">Key</th><th scope="col">DTS equivalent</th><th scope="col" class="num">Permissions</th><th scope="col" class="num">Assignments</th><th scope="col">Clone</th></tr></thead>
+  <tbody>
+  {% for r in roles %}
+  <tr>
+    <th scope="row"><a href="{{ url_for('admin.role_edit', role_id=r.id) }}">{{ r.name }}</a>{% if r.is_system %} <span class="tag tag-created">Built-in</span>{% endif %}<br><span class="muted">{{ r.description }}</span></th>
+    <td><code>{{ r.key }}</code></td><td>{{ r.legacy_level or '' }}</td>
+    <td class="num">{{ r.nperm }}</td><td class="num">{{ r.nassign }}</td>
+    <td><a href="{{ url_for('admin.role_edit', clone=r.id) }}">Clone<span class="sr-only"> {{ r.name }}</span></a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% endblock %}

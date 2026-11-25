@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Routing list: {{ rl.name }}{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(url_for('admin.routing'), 'Routing lists'), (None, rl.name)] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Routing list: {{ rl.name }}</h1>
+<p>Organization: {{ rl.code }}. {{ rl.description }}</p>
+<h2>Steps, in order</h2>
+{% call m.table_wrap('Routing steps') %}
+<table class="table">
+  <caption class="sr-only">Routing steps</caption>
+  <thead><tr><th scope="col" class="num">Order</th><th scope="col">Step</th><th scope="col">Stamp</th><th scope="col">Required permission</th><th scope="col">Assigned to</th><th scope="col">Applies to</th><th scope="col">Remove</th></tr></thead>
+  <tbody>
+  {% for s in steps %}
+  <tr><td class="num">{{ s.seq }}</td><th scope="row">{{ s.name }}</th><td>{{ s.stamp }}</td><td><code>{{ s.required_permission }}</code></td>
+    <td>{{ s.username or 'Anyone with the permission' }}</td>
+    <td>{% for t in s.doc_types.split(',') %}{{ DOC_TYPE_LABELS.get(t, t) }}{{ ', ' if not loop.last }}{% endfor %}</td>
+    <td><form method="post" class="inline" data-confirm="Remove step {{ s.name }}?">{{ m.csrf() }}
+      <input type="hidden" name="action" value="delete_step"><input type="hidden" name="step_id" value="{{ s.id }}">
+      <button type="submit" class="btn btn-small btn-danger">Remove<span class="sr-only"> {{ s.name }}</span></button></form></td></tr>
+  {% else %}<tr><td colspan="7">No steps yet. Documents on this list cannot be signed.</td></tr>{% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+
+<section aria-labelledby="add-step" class="card">
+  <h2 id="add-step">Add a step</h2>
+  {{ m.error_summary(errors) }}
+  <form method="post" novalidate>
+    {{ m.csrf() }}<input type="hidden" name="action" value="add_step">
+    <div class="grid-2">
+      {{ m.input('seq', 'Order', values.seq, errors, required=True, width='sm', hint='Lower numbers act first.', attrs='inputmode="numeric"') }}
+      {{ m.input('name', 'Step name', values.name, errors, required=True, hint='For example, Supervisor review.') }}
+      {{ m.input('stamp', 'Stamp', values.stamp, errors, required=True, width='md', hint='Recorded in history, such as REVIEWED, APPROVED or CERTIFIED.') }}
+      {% set popts = [] %}{% for p in perms %}{% set _ = popts.append((p.key, p.name ~ ' (' ~ p.key ~ ')')) %}{% endfor %}
+      {{ m.select('required_permission', 'Required permission', popts, values.required_permission, errors, required=True) }}
+    </div>
+    {% set uopts = [] %}{% for u in users %}{% set _ = uopts.append((u.id, u.last_name ~ ', ' ~ u.first_name ~ ' (' ~ u.username ~ ')')) %}{% endfor %}
+    {{ m.select('assignee_user_id', 'Assign to a specific person', uopts, values.assignee_user_id, errors, placeholder='Anyone with the permission',
+       hint='They must also hold the required permission.') }}
+    <fieldset id="doc_types" class="{% if errors.doc_types %}has-error{% endif %}" tabindex="-1">
+      <legend>Applies to</legend>
+      {% if errors.doc_types %}<p class="field-error"><span class="sr-only">Error:</span> {{ errors.doc_types }}</p>{% endif %}
+      {% for k, v in DOC_TYPE_LABELS.items() %}
+      {{ m.checkbox('doc_types', v, k in values.doc_types, value=k, id='dt-' ~ k) }}
+      {% endfor %}
+    </fieldset>
+    <button type="submit" class="btn btn-primary">Add step</button>
+  </form>
+</section>
+
+<section aria-labelledby="del-rl" class="card card-warn">
+  <h2 id="del-rl">Delete this routing list</h2>
+  <form method="post" data-confirm="Delete routing list {{ rl.name }}?">{{ m.csrf() }}
+    <input type="hidden" name="action" value="delete_list">
+    <button type="submit" class="btn btn-danger">Delete routing list</button></form>
+</section>
+{% endblock %}

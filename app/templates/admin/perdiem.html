@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Per diem rates{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(None, 'Per diem rates')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Per diem rates</h1>
+<div class="alert alert-info" role="note"><span class="alert-label">Note:</span> The seeded rates are sample data. Before use, load the official CONUS (GSA) and OCONUS (DTMO) rate tables.</div>
+{% call m.table_wrap('Per diem rates') %}
+<table class="table table-compact">
+  <caption class="sr-only">Per diem rates by location and season</caption>
+  <thead><tr><th scope="col">Location</th><th scope="col">State</th><th scope="col">Season</th><th scope="col" class="num">Lodging</th><th scope="col" class="num">M&amp;IE</th><th scope="col">FY</th><th scope="col">Delete</th></tr></thead>
+  <tbody>
+  {% for r in rates %}
+  <tr><th scope="row">{{ r.location }}</th><td>{{ r.state }}</td><td>{{ r.season_start }} to {{ r.season_end }}</td>
+    <td class="num">{{ r.lodging|money }}</td><td class="num">{{ r.mie|money }}</td><td>{{ r.fiscal_year }}</td>
+    <td><form method="post" class="inline" data-confirm="Delete this rate?">{{ m.csrf() }}<input type="hidden" name="action" value="delete"><input type="hidden" name="rate_id" value="{{ r.id }}">
+      <button type="submit" class="btn btn-small btn-danger">Delete<span class="sr-only"> {{ r.location }} {{ r.season_start }}</span></button></form></td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+<section aria-labelledby="add-rate" class="card">
+  <h2 id="add-rate">Add a rate</h2>
+  {{ m.error_summary(errors) }}
+  <form method="post" novalidate>
+    {{ m.csrf() }}<input type="hidden" name="action" value="add">
+    <div class="grid-2">
+      {{ m.input('location', 'Location', values.location, errors, required=True) }}
+      {{ m.input('state', 'State or country code', values.state, errors, required=True, width='sm') }}
+      {{ m.input('season_start', 'Season start (MM-DD)', values.season_start, errors, required=True, width='sm') }}
+      {{ m.input('season_end', 'Season end (MM-DD)', values.season_end, errors, required=True, width='sm') }}
+      {{ m.input('lodging', 'Maximum lodging, in dollars', values.lodging, errors, required=True, width='sm', attrs='inputmode="decimal"') }}
+      {{ m.input('mie', 'M&IE, in dollars', values.mie, errors, required=True, width='sm', attrs='inputmode="decimal"') }}
+      {{ m.input('fiscal_year', 'Fiscal year', values.fiscal_year, errors, required=True, width='sm', attrs='inputmode="numeric"') }}
+    </div>
+    <button type="submit" class="btn btn-primary">Add rate</button>
+  </form>
+</section>
+{% endblock %}

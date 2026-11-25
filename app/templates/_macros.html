@@ -1,0 +1,101 @@
+{# Accessible form + UI macros. Every input has a visible <label>, hints and
+   errors are tied with aria-describedby, invalid fields get aria-invalid. #}
+
+{% macro error_summary(errors) %}
+{% if errors %}
+<div class="error-summary" role="alert" aria-labelledby="error-summary-title" tabindex="-1" data-error-summary>
+  <h2 id="error-summary-title">There {{ 'is a problem' if errors|length == 1 else 'are ' ~ errors|length ~ ' problems' }}</h2>
+  <ul>
+    {% for field, msg in errors.items() %}
+    <li><a href="#{{ field }}">{{ msg }}</a></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro _described(name, hint, errors) -%}
+{%- set ids = [] -%}
+{%- if hint %}{% set _ = ids.append(name ~ '-hint') %}{% endif -%}
+{%- if errors and errors.get(name) %}{% set _ = ids.append(name ~ '-error') %}{% endif -%}
+{%- if ids %} aria-describedby="{{ ids|join(' ') }}"{% endif -%}
+{%- if errors and errors.get(name) %} aria-invalid="true"{% endif -%}
+{%- endmacro %}
+
+{% macro _hint_error(name, hint, errors) %}
+{% if hint %}<div class="hint" id="{{ name }}-hint">{{ hint }}</div>{% endif %}
+{% if errors and errors.get(name) %}<p class="field-error" id="{{ name }}-error"><span class="sr-only">Error:</span> {{ errors[name] }}</p>{% endif %}
+{% endmacro %}
+
+{% macro input(name, label, value='', errors=None, type='text', hint=None, required=False, autocomplete=None, width=None, attrs='') %}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="{{ name }}">{{ label }}{% if not required %} <span class="optional">(optional)</span>{% endif %}</label>
+  {{ _hint_error(name, hint, errors) }}
+  <input class="input{% if width %} w-{{ width }}{% endif %}" id="{{ name }}" name="{{ name }}" type="{{ type }}"
+         value="{{ value if value is not none else '' }}"{% if required %} required aria-required="true"{% endif %}
+         {%- if autocomplete %} autocomplete="{{ autocomplete }}"{% endif %}{{ _described(name, hint, errors) }} {{ attrs|safe }}>
+</div>
+{% endmacro %}
+
+{% macro textarea(name, label, value='', errors=None, hint=None, required=False, rows=4) %}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="{{ name }}">{{ label }}{% if not required %} <span class="optional">(optional)</span>{% endif %}</label>
+  {{ _hint_error(name, hint, errors) }}
+  <textarea class="input" id="{{ name }}" name="{{ name }}" rows="{{ rows }}"{% if required %} required aria-required="true"{% endif %}{{ _described(name, hint, errors) }}>{{ value or '' }}</textarea>
+</div>
+{% endmacro %}
+
+{% macro select(name, label, options, value='', errors=None, hint=None, required=False, placeholder='- Select -') %}
+{# options: list of (value, text) #}
+<div class="field{% if errors and errors.get(name) %} has-error{% endif %}">
+  <label for="{{ name }}">{{ label }}{% if not required %} <span class="optional">(optional)</span>{% endif %}</label>
+  {{ _hint_error(name, hint, errors) }}
+  <select class="input" id="{{ name }}" name="{{ name }}"{% if required %} required aria-required="true"{% endif %}{{ _described(name, hint, errors) }}>
+    {% if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+    {% for v, t in options %}
+    <option value="{{ v }}" {% if v|string == value|string %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+  </select>
+</div>
+{% endmacro %}
+
+{% macro checkbox(name, label, checked=False, value='1', hint=None, id=None) %}
+{% set cid = id or name %}
+<div class="checkbox">
+  <input type="checkbox" id="{{ cid }}" name="{{ name }}" value="{{ value }}" {% if checked %}checked{% endif %}{% if hint %} aria-describedby="{{ cid }}-hint"{% endif %}>
+  <label for="{{ cid }}">{{ label }}</label>
+  {% if hint %}<div class="hint" id="{{ cid }}-hint">{{ hint }}</div>{% endif %}
+</div>
+{% endmacro %}
+
+{% macro csrf() %}<input type="hidden" name="csrf_token" value="{{ csrf_token }}">{% endmacro %}
+
+{% macro status_tag(status, labels) %}
+<span class="tag tag-{{ status|lower }}">{{ labels.get(status, status) }}</span>
+{% endmacro %}
+
+{% macro wizard(steps, current, doc) %}
+{% if doc %}
+<nav aria-label="Document steps" class="wizard">
+  <ol>
+    {% for key, label in steps %}
+    {% set ep = 'documents.view' if key == 'review' else 'documents.' ~ key %}
+    {% set skip = doc.doc_type == 'LOCAL' and key == 'itinerary' %}
+    {% if not skip %}
+    <li class="{{ 'current' if key == current }}">
+      <a href="{{ url_for(ep, doc_id=doc.id) }}" {% if key == current %}aria-current="step"{% endif %}>
+        <span class="step-num" aria-hidden="true">{{ loop.index }}</span> {{ label }}{% if key == current %}<span class="sr-only"> (current step)</span>{% endif %}
+      </a>
+    </li>
+    {% endif %}
+    {% endfor %}
+  </ol>
+</nav>
+{% endif %}
+{% endmacro %}
+
+{% macro table_wrap(label) %}
+<div class="table-wrap" role="region" aria-label="{{ label }}" tabindex="0">
+{{ caller() }}
+</div>
+{% endmacro %}

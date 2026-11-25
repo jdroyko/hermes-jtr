@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ doc.doc_number }}: {{ DOC_TYPE_LABELS[doc.doc_type] }}{% endblock %}
+{% block content %}
+<div class="title-row">
+  <h1>{{ DOC_TYPE_LABELS[doc.doc_type] }} {{ doc.doc_number }}{% if doc.amendment %} <span class="muted">(amendment {{ doc.amendment }})</span>{% endif %}</h1>
+  <p class="no-print"><a href="#" data-print>Print this document</a></p>
+</div>
+{% if editable %}{{ m.wizard(wizard_steps, 'review', doc) }}{% endif %}
+
+<dl class="summary-list">
+  <div><dt>Status</dt><dd>{{ m.status_tag(doc.status, STATUS_LABELS) }}{% if current_step %} at step <strong>{{ current_step.name }}</strong>{% endif %}</dd></div>
+  <div><dt>Traveler</dt><dd>{{ traveler.first_name }} {{ traveler.last_name }}, {{ traveler.rank_grade }} ({{ org.code }})</dd></div>
+  {% if preparer.id != traveler.id %}<div><dt>Prepared by</dt><dd>{{ preparer.first_name }} {{ preparer.last_name }}</dd></div>{% endif %}
+  <div><dt>Purpose</dt><dd>{{ doc.trip_purpose }}: {{ doc.trip_description }}</dd></div>
+  <div><dt>Dates</dt><dd>{{ doc.start_date|datefmt }} to {{ doc.end_date|datefmt }}</dd></div>
+  <div><dt>Line of accounting</dt><dd>{% if loa %}{{ loa.label }} <code>{{ loa.code }}</code>{% if funds %}. Funds available before this document: {{ funds.available|money }}{% endif %}{% else %}None selected{% endif %}</dd></div>
+  {% if parent %}<div><dt>Authorization</dt><dd><a href="{{ url_for('documents.view', doc_id=parent.id) }}">{{ parent.doc_number }}</a> (authorized {{ parent.total_estimate|money }})</dd></div>{% endif %}
+  {% if voucher %}<div><dt>Voucher</dt><dd><a href="{{ url_for('documents.view', doc_id=voucher.id) }}">{{ voucher.doc_number }}</a></dd></div>{% endif %}
+  {% if doc.justification %}<div><dt>Traveler justification</dt><dd>{{ doc.justification }}</dd></div>{% endif %}
+</dl>
+
+<section aria-labelledby="totals-title" class="card">
+  <h2 id="totals-title">Cost summary</h2>
+  <dl class="summary-list">
+    <div><dt>Per diem (lodging and M&amp;IE)</dt><dd>{{ per_diem.total|money }}</dd></div>
+    <div><dt>Other expenses</dt><dd>{{ exp_total|money }}</dd></div>
+    <div><dt>{{ 'Estimated total' if doc.doc_type == 'AUTH' else 'Total claimed' }}</dt><dd><strong>{{ total|money }}</strong></dd></div>
+  </dl>
+</section>
+
+{% if findings %}
+<section aria-labelledby="audit-title" class="card card-warn">
+  <h2 id="audit-title">Pre-audit flags ({{ findings|length }})</h2>
+  <p>These items need a justification from the traveler and will be reviewed by approving officials.</p>
+  <ul>
+    {% for f in findings %}<li><strong>{{ f.code }}</strong>: {{ f.message }} <span class="muted">({{ f.ref }})</span></li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if doc.doc_type != 'LOCAL' %}
+<section aria-labelledby="itin-title">
+  <h2 id="itin-title">Itinerary</h2>
+  {% if stops %}
+  <ul>{% for s in stops %}<li>{{ s.location }}, {{ s.state }}: {{ s.arrive_date|datefmt }} to {{ s.depart_date|datefmt }} ({{ s.nights }} night{{ '' if s.nights == 1 else 's' }}{% if s.gov_quarters %}, government quarters{% endif %})</li>{% endfor %}</ul>
+  {% else %}<p>No TDY locations.</p>{% endif %}
+  <h3>Per diem</h3>
+  {% for n in per_diem.notes %}<p class="muted">{{ n }}</p>{% endfor %}
+  {% include "documents/_perdiem_table.html" %}
+</section>
+{% endif %}
+
+<section aria-labelledby="exp-title">
+  <h2 id="exp-title">Expenses</h2>
+  {% if expenses %}
+  {% call m.table_wrap('Expenses') %}
+  <table class="table">
+    <caption class="sr-only">Expenses</caption>
+    <thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Description</th><th scope="col">Paid with</th>{% if doc.doc_type != 'AUTH' %}<th scope="col">Receipt</th>{% endif %}<th scope="col" class="num">Amount</th></tr></thead>
+    <tbody>
+    {% for e in expenses %}
+    <tr><td>{{ e.expense_date|datefmt }}</td><th scope="row">{{ CATEGORY_LABELS.get(e.category, e.category) }}</th><td>{{ e.description }}</td>
+      <td>{{ e.payment_method }}</td>{% if doc.doc_type != 'AUTH' %}<td>{{ 'Attached' if e.receipt_attached else 'None' }}</td>{% endif %}<td class="num">{{ amount_of(e)|money }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+  {% else %}<p>No expenses.</p>{% endif %}
+</section>
+
+<section aria-labelledby="routing-title">
+  <h2 id="routing-title">Routing</h2>
+  {% if steps %}
+  <ol class="routing-steps">
+    {% for s in steps %}
+    {% set done = doc.status in ('APPROVED','PAID') or (doc.status == 'ROUTING' and s.seq < doc.current_step_seq) %}
+    {% set cur = current_step and s.id == current_step.id %}
+    <li class="{{ 'done' if done else ('current' if cur else '') }}">
+      <strong>{{ s.name }}</strong>, stamp {{ s.stamp }}
+      <span class="tag {{ 'tag-approved' if done else ('tag-routing' if cur else 'tag-created') }}">{{ 'Complete' if done else ('Awaiting action' if cur else 'Pending') }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p>No routing list applies. Contact your Defense Travel Administrator.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="actions-title" id="actions" class="card no-print">
+  <h2 id="actions-title">Actions</h2>
+  {% set any_action = signable or can_act or returnable or overridable or cancellable or amendable or editable %}
+  {% if editable %}
+  <p><a href="{{ url_for('documents.trip', doc_id=doc.id) }}">Edit trip details</a>
+    {% if doc.doc_type != 'LOCAL' %} · <a href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Edit itinerary</a>{% endif %}
+    · <a href="{{ url_for('documents.expenses', doc_id=doc.id) }}">Edit expenses</a></p>
+  {% endif %}
+
+  {% if signable %}
+  <form method="post" action="{{ url_for('documents.sign', doc_id=doc.id) }}" id="sign" novalidate>
+    {{ m.csrf() }}
+    <h3>Sign and submit</h3>
+    {% if findings %}
+    {{ m.textarea('justification', 'Justification for pre-audit flags', doc.justification, None, required=True,
+       hint='Explain each flagged item listed above.') }}
+    {% endif %}
+    {{ m.checkbox('certify', ('I certify that this document is true and correct and that the travel is required for official business.' if own else 'I am signing on behalf of the traveler, who has reviewed and agrees with this document.'),
+       hint='Knowingly submitting a false claim is punishable under 18 U.S.C. 287 and 1001.') }}
+    <button type="submit" class="btn btn-primary">Sign and submit</button>
+  </form>
+  {% endif %}
+
+  {% if can_act %}
+  <form method="post" action="{{ url_for('documents.action', doc_id=doc.id) }}" novalidate>
+    {{ m.csrf() }}
+    <h3>{{ current_step.name }}</h3>
+    {{ m.textarea('remarks', 'Remarks', '', None, hint='Required to return the document. Optional when stamping.', rows=3) }}
+    <div class="button-row">
+      <button type="submit" name="action" value="stamp" class="btn btn-primary">Apply {{ current_step.stamp }} stamp</button>
+      {% if returnable %}<button type="submit" name="action" value="return" class="btn btn-secondary">Return to traveler</button>{% endif %}
+    </div>
+  </form>
+  {% elif doc.status == 'ROUTING' and act_reason and not own %}
+  <p class="muted">You cannot act on this document: {{ act_reason }}</p>
+  {% endif %}
+
+  {% if overridable %}
+  <details>
+    <summary>Override routing (administrators)</summary>
+    <form method="post" action="{{ url_for('documents.action', doc_id=doc.id) }}" novalidate>
+      {{ m.csrf() }}
+      <div class="field"><label for="override-remarks">Reason for override</label>
+        <textarea class="input" id="override-remarks" name="remarks" rows="2" required aria-required="true"></textarea></div>
+      <button type="submit" name="action" value="override" class="btn btn-danger">Skip current step</button>
+    </form>
+  </details>
+  {% endif %}
+
+  {% if amendable %}
+  <form method="post" action="{{ url_for('documents.action', doc_id=doc.id) }}" class="inline">
+    {{ m.csrf() }}<button type="submit" name="action" value="amend" class="btn btn-secondary">Amend authorization</button>
+  </form>
+  {% endif %}
+  {% if cancellable %}
+  <form method="post" action="{{ url_for('documents.action', doc_id=doc.id) }}" class="inline" data-confirm="Cancel this document? This cannot be undone.">
+    {{ m.csrf() }}<button type="submit" name="action" value="cancel" class="btn btn-danger">Cancel document</button>
+  </form>
+  {% endif %}
+  {% if not any_action %}<p>No actions are available to you for this document.</p>{% endif %}
+</section>
+
+<section aria-labelledby="hist-title">
+  <h2 id="hist-title">History</h2>
+  {% call m.table_wrap('Document history') %}
+  <table class="table table-compact">
+    <caption class="sr-only">Document history, oldest first</caption>
+    <thead><tr><th scope="col">When (UTC)</th><th scope="col">Who</th><th scope="col">Stamp</th><th scope="col">Remarks</th></tr></thead>
+    <tbody>
+    {% for h in history %}
+    <tr><td>{{ h.created_at }}</td><td>{{ h.first_name }} {{ h.last_name }}</td><th scope="row">{{ h.stamp or h.action }}</th><td>{{ h.remarks }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+</section>
+{% endblock %}

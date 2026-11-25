@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ doc.doc_number }}: Expenses{% endblock %}
+{% block content %}
+<h1>{{ doc.doc_number }}: Expenses</h1>
+{{ m.wizard(steps, current, doc) }}
+<p>Add transportation and other reimbursable expenses. Do not enter lodging or meals here; per diem covers them.</p>
+{{ m.error_summary(errors) }}
+
+<section aria-labelledby="exp-title">
+<h2 id="exp-title">Expenses entered</h2>
+{% if expenses %}
+{% call m.table_wrap('Expenses') %}
+<table class="table">
+  <caption class="sr-only">Expenses on this document</caption>
+  <thead><tr><th scope="col">Date</th><th scope="col">Type</th><th scope="col">Description</th><th scope="col">Paid with</th>
+    <th scope="col">Receipt</th><th scope="col" class="num">Amount</th><th scope="col">Remove</th></tr></thead>
+  <tbody>
+  {% for e in expenses %}
+  <tr>
+    <td>{{ e.expense_date|datefmt }}</td>
+    <th scope="row">{{ CATEGORY_LABELS.get(e.category, e.category) }}</th>
+    <td>{{ e.description }}{% if e.category == 'POV_MILEAGE' %} ({{ '%g'|format(e.miles) }} miles at {{ mileage_rate|money }} per mile){% endif %}</td>
+    <td>{{ e.payment_method }}</td>
+    <td>{{ 'Attached' if e.receipt_attached else 'None' }}</td>
+    <td class="num">{{ amount_of(e)|money }}</td>
+    <td>
+      <form method="post" class="inline" data-confirm="Remove this expense?">
+        {{ m.csrf() }}<input type="hidden" name="action" value="delete"><input type="hidden" name="expense_id" value="{{ e.id }}">
+        <button type="submit" class="btn btn-small btn-danger">Remove<span class="sr-only"> {{ CATEGORY_LABELS.get(e.category) }} on {{ e.expense_date }}</span></button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% else %}
+<p>No expenses added yet.</p>
+{% endif %}
+</section>
+
+<section aria-labelledby="add-exp-title" class="card">
+<h2 id="add-exp-title">Add an expense</h2>
+<form method="post" novalidate>
+  {{ m.csrf() }}<input type="hidden" name="action" value="add">
+  <div class="grid-2">
+    {{ m.input('expense_date', 'Date', values.expense_date, errors, type='date', required=True) }}
+    {{ m.select('category', 'Expense type', categories, values.category, errors, required=True) }}
+  </div>
+  {{ m.input('description', 'Description', values.description, errors,
+     hint='Required for rental cars: explain why one is needed.') }}
+  <div class="grid-2">
+    {{ m.input('amount', 'Amount, in dollars', values.amount, errors, width='sm', hint='Leave blank for POV mileage.', attrs='inputmode="decimal"') }}
+    {{ m.input('miles', 'Miles driven', values.miles, errors, width='sm', hint='POV mileage only. Paid at ' ~ (mileage_rate|money) ~ ' per mile.', attrs='inputmode="decimal"') }}
+  </div>
+  {{ m.select('payment_method', 'Paid with', methods, values.payment_method, errors, required=True, placeholder=None) }}
+  {% if doc.doc_type != 'AUTH' %}
+  {{ m.checkbox('receipt_attached', 'I have a receipt for this expense', values.receipt_attached,
+     hint='Receipts are required for lodging and for any expense of $75 or more.') }}
+  {% endif %}
+  <button type="submit" class="btn btn-secondary">Add expense</button>
+</form>
+</section>
+
+<div class="button-row">
+  <a class="btn btn-primary" href="{{ url_for('documents.view', doc_id=doc.id) }}">Continue to review</a>
+  {% if doc.doc_type != 'LOCAL' %}<a class="btn btn-secondary" href="{{ url_for('documents.itinerary', doc_id=doc.id) }}">Back to itinerary</a>{% endif %}
+</div>
+{% endblock %}

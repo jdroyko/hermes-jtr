@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ 'My profile' if self_service else 'Profile: ' ~ subject.first_name ~ ' ' ~ subject.last_name }}{% endblock %}
+{% block breadcrumbs %}
+{% if not self_service %}
+<nav aria-label="Breadcrumb" class="breadcrumbs"><ol>
+  <li><a href="{{ url_for('admin.index') }}">Administration</a></li>
+  <li><a href="{{ url_for('admin.users') }}">Users</a></li>
+  <li><a href="{{ url_for('admin.user_edit', user_id=subject.id) }}">{{ subject.username }}</a></li>
+  <li aria-current="page">Profile</li>
+</ol></nav>
+{% endif %}
+{% endblock %}
+{% block content %}
+<h1>{{ 'My profile' if self_service else 'Profile: ' ~ subject.first_name ~ ' ' ~ subject.last_name }}</h1>
+<p>Organization: <strong>{{ org.name }}</strong> ({{ org.code }}). Username: <strong>{{ subject.username }}</strong></p>
+{% if not editable %}<div class="alert alert-info" role="status"><span class="alert-label">Note:</span> You can view this profile but not change it.</div>{% endif %}
+{{ m.error_summary(errors) }}
+<form method="post" novalidate>
+  {{ m.csrf() }}
+  <fieldset {% if not editable %}disabled{% endif %}>
+    <legend>Personal information</legend>
+    <div class="grid-2">
+      {{ m.input('first_name', 'First name', values.first_name, errors, required=True, autocomplete='given-name') }}
+      {{ m.input('last_name', 'Last name', values.last_name, errors, required=True, autocomplete='family-name') }}
+      {{ m.input('email', 'Email address', values.email, errors, type='email', required=True, autocomplete='email') }}
+      {{ m.input('phone', 'Work phone', values.phone, errors, type='tel', autocomplete='tel') }}
+      {{ m.input('rank_grade', 'Rank or grade', values.rank_grade, errors, hint='For example, E-6, O-3 or GS-12.') }}
+      {{ m.input('duty_station', 'Permanent duty station', values.duty_station, errors) }}
+      {{ m.input('residence_city', 'Residence city', values.residence_city, errors, autocomplete='address-level2') }}
+    </div>
+  </fieldset>
+  <fieldset {% if not editable %}disabled{% endif %}>
+    <legend>Payment information</legend>
+    <p class="hint">For this prototype, store only the last 4 digits.</p>
+    <div class="grid-2">
+      {{ m.input('gtcc_last4', 'Government travel charge card, last 4 digits', values.gtcc_last4, errors, width='sm', attrs='inputmode="numeric" maxlength="4"') }}
+      {{ m.input('eft_last4', 'Bank account for EFT, last 4 digits', values.eft_last4, errors, width='sm', attrs='inputmode="numeric" maxlength="4"') }}
+    </div>
+  </fieldset>
+  <fieldset {% if not editable %}disabled{% endif %}>
+    <legend>Routing</legend>
+    <div class="field">
+      <label for="default_routing_list_id">Default routing list <span class="optional">(optional)</span></label>
+      <div class="hint" id="rl-hint">Your documents are sent through this list of reviewers and approvers.</div>
+      <select class="input" id="default_routing_list_id" name="default_routing_list_id" aria-describedby="rl-hint">
+        <option value="">Use my organization's default</option>
+        {% for rl in routing_lists %}
+        <option value="{{ rl.id }}" {% if rl.id == values.default_routing_list_id %}selected{% endif %}>{{ rl.name }} ({{ rl.code }})</option>
+        {% endfor %}
+      </select>
+    </div>
+  </fieldset>
+  {% if editable %}<button type="submit" class="btn btn-primary">Save profile</button>{% endif %}
+</form>
+
+{% if perms %}
+<section aria-labelledby="perm-title" class="card">
+  <h2 id="perm-title">My effective permissions</h2>
+  <p>These come from the roles your administrator has assigned to you.</p>
+  <ul class="columns">{% for p in perms %}<li><code>{{ p }}</code></li>{% endfor %}</ul>
+</section>
+{% endif %}
+{% endblock %}

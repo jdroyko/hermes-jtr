@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Documents{% endblock %}
+{% block content %}
+<h1>Documents</h1>
+<form method="get" class="filter-bar" aria-label="Filter documents">
+  {% if can('document.view.org') %}
+  <div class="field">
+    <label for="scope">Show</label>
+    <select class="input" id="scope" name="scope">
+      <option value="mine" {% if scope == 'mine' %}selected{% endif %}>My documents</option>
+      <option value="org" {% if scope == 'org' %}selected{% endif %}>All documents in my organizations</option>
+    </select>
+  </div>
+  {% endif %}
+  <div class="field">
+    <label for="type">Type</label>
+    <select class="input" id="type" name="type">
+      <option value="">All types</option>
+      {% for k, v in DOC_TYPE_LABELS.items() %}<option value="{{ k }}" {% if k == doc_type %}selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="field">
+    <label for="status">Status</label>
+    <select class="input" id="status" name="status">
+      <option value="">All statuses</option>
+      {% for k, v in STATUS_LABELS.items() %}<option value="{{ k }}" {% if k == status %}selected{% endif %}>{{ v }}</option>{% endfor %}
+    </select>
+  </div>
+  <button type="submit" class="btn btn-secondary">Apply filters</button>
+</form>
+
+<p role="status">{{ docs|length }} document{{ '' if docs|length == 1 else 's' }} found.</p>
+{% if docs %}
+{% call m.table_wrap('Documents') %}
+<table class="table">
+  <caption class="sr-only">Documents matching the filters</caption>
+  <thead><tr><th scope="col">Document</th><th scope="col">Type</th><th scope="col">Traveler</th><th scope="col">Org</th><th scope="col">Trip</th><th scope="col">Dates</th><th scope="col">Status</th><th scope="col" class="num">Total</th></tr></thead>
+  <tbody>
+  {% for d in docs %}
+    <tr>
+      <th scope="row"><a href="{{ url_for('documents.view', doc_id=d.id) }}">{{ d.doc_number }}</a>{% if d.amendment %} <span class="muted">(amendment {{ d.amendment }})</span>{% endif %}</th>
+      <td>{{ DOC_TYPE_LABELS[d.doc_type] }}</td>
+      <td>{{ d.last_name }}, {{ d.first_name }}</td>
+      <td>{{ d.org_code }}</td>
+      <td>{{ d.trip_description }}</td>
+      <td>{{ d.start_date|datefmt }} to {{ d.end_date|datefmt }}</td>
+      <td>{{ m.status_tag(d.status, STATUS_LABELS) }}</td>
+      <td class="num">{{ d.total_estimate|money }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% endif %}
+{% endblock %}

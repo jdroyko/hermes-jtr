@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Accessibility statement{% endblock %}
+{% block content %}
+<div class="prose">
+<h1>Accessibility statement</h1>
+<p>This application is designed to conform to Section 508 of the Rehabilitation Act (36 CFR 1194), which
+incorporates the Web Content Accessibility Guidelines (WCAG) 2.0 Level AA, and targets WCAG 2.2 Level AA.</p>
+
+<h2>What we have done</h2>
+<ul>
+  <li>Every page has a unique title, a "Skip to main content" link, and header, navigation, main and footer landmarks.</li>
+  <li>All features work with a keyboard alone. Focus is always visible and follows a logical order.</li>
+  <li>All form fields have visible labels. Hints and error messages are announced by screen readers.</li>
+  <li>When a form has errors, a summary appears at the top with links to each field, and receives focus.</li>
+  <li>Status is never shown by color alone: every status tag and alert includes text.</li>
+  <li>Text and interface components meet a contrast ratio of at least 4.5:1 for text and 3:1 for components.</li>
+  <li>Data tables have captions and header cells with scope.</li>
+  <li>Pages reflow to a 320-pixel width and support 200% text zoom and custom text spacing without loss of content.</li>
+  <li>Before your session times out, you are warned and can extend it (WCAG 2.2.1).</li>
+  <li>Animations are minimal and respect your "reduce motion" setting.</li>
+  <li>The core application is rendered on the server and works without JavaScript.</li>
+</ul>
+
+<h2>Known limitations</h2>
+<ul>
+  <li>Receipt uploads are not yet available; a checkbox records whether a receipt is attached.</li>
+  <li>The permission matrix is a large grid. A role-by-role editor is provided as an alternative.</li>
+</ul>
+
+<h2>Feedback</h2>
+<p>If you have difficulty using any part of this site, contact your Defense Travel Administrator and describe the
+page, the task, and the assistive technology you use.</p>
+</div>
+{% endblock %}

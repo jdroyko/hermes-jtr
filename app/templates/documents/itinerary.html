@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ doc.doc_number }}: Itinerary{% endblock %}
+{% block content %}
+<h1>{{ doc.doc_number }}: Itinerary and lodging</h1>
+{{ m.wizard(steps, current, doc) }}
+<p>Trip dates: <strong>{{ doc.start_date|datefmt }}</strong> to <strong>{{ doc.end_date|datefmt }}</strong>.
+Add each place where you will stay overnight.</p>
+{{ m.error_summary(errors) }}
+
+<section aria-labelledby="stops-title">
+<h2 id="stops-title">TDY locations</h2>
+{% if stops %}
+{% call m.table_wrap('TDY locations') %}
+<table class="table">
+  <caption class="sr-only">TDY locations on this document</caption>
+  <thead><tr><th scope="col">Location</th><th scope="col">Arrive</th><th scope="col">Depart</th><th scope="col">Nights</th>
+    <th scope="col">Lodging</th>{% if doc.doc_type != 'AUTH' %}<th scope="col">Actual nightly cost</th>{% endif %}<th scope="col">Remove</th></tr></thead>
+  <tbody>
+  {% for s in stops %}
+  <tr>
+    <th scope="row">{{ s.location }}, {{ s.state }}</th>
+    <td>{{ s.arrive_date|datefmt }}</td>
+    <td>{{ s.depart_date|datefmt }}</td>
+    <td>{{ s.nights }}</td>
+    <td>{{ 'Government quarters' if s.gov_quarters else 'Commercial' }}</td>
+    {% if doc.doc_type != 'AUTH' %}
+    <td>
+      {% if not s.gov_quarters %}
+      <form method="post" class="inline-form">
+        {{ m.csrf() }}<input type="hidden" name="action" value="lodging"><input type="hidden" name="stop_id" value="{{ s.id }}">
+        <label for="lodging_nightly_{{ s.id }}" class="sr-only">Actual nightly lodging cost at {{ s.location }}, in dollars</label>
+        <input class="input w-sm" id="lodging_nightly_{{ s.id }}" name="lodging_nightly_{{ s.id }}" inputmode="decimal"
+               value="{{ '%.2f'|format(s.lodging_nightly) if s.lodging_nightly is not none else '' }}"
+               {% if errors.get('lodging_nightly_' ~ s.id) %}aria-invalid="true"{% endif %}>
+        <button type="submit" class="btn btn-small btn-secondary">Save<span class="sr-only"> lodging for {{ s.location }}</span></button>
+      </form>
+      {% else %}N/A{% endif %}
+    </td>
+    {% endif %}
+    <td>
+      <form method="post" class="inline" data-confirm="Remove {{ s.location }} from the itinerary?">
+        {{ m.csrf() }}<input type="hidden" name="action" value="delete"><input type="hidden" name="stop_id" value="{{ s.id }}">
+        <button type="submit" class="btn btn-small btn-danger">Remove<span class="sr-only"> {{ s.location }}</span></button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+{% else %}
+<p>No locations added yet.</p>
+{% endif %}
+</section>
+
+<section aria-labelledby="add-title" class="card">
+<h2 id="add-title">Add a location</h2>
+<form method="post" novalidate>
+  {{ m.csrf() }}<input type="hidden" name="action" value="add">
+  {% set loc_opts = [] %}{% for l in locations %}{% set _ = loc_opts.append((l.id, l.location ~ ', ' ~ l.state)) %}{% endfor %}
+  {{ m.select('rate_id', 'TDY location', loc_opts, values.rate_id, errors, required=True,
+     hint='If your location is not listed, choose Standard CONUS.') }}
+  <div class="grid-2">
+    {{ m.input('arrive_date', 'Arrival date', values.arrive_date, errors, type='date', required=True) }}
+    {{ m.input('depart_date', 'Departure date', values.depart_date, errors, type='date', required=True) }}
+  </div>
+  {% if doc.doc_type != 'AUTH' %}
+  {{ m.input('lodging_nightly', 'Actual nightly lodging cost, in dollars', values.lodging_nightly, errors, width='sm',
+     hint='From your lodging receipt, excluding taxes. Leave blank to enter it later.', attrs='inputmode="decimal"') }}
+  {% endif %}
+  {{ m.checkbox('gov_quarters', 'I will stay in government quarters', values.gov_quarters,
+     hint='Lodging allowance is not paid when government quarters are used. Claim the quarters fee as an expense.') }}
+  <button type="submit" class="btn btn-secondary">Add location</button>
+</form>
+</section>
+
+<section aria-labelledby="pd-title">
+<h2 id="pd-title">Per diem {{ 'estimate' if doc.doc_type == 'AUTH' else 'calculation' }}</h2>
+{% for n in per_diem.notes %}<div class="alert alert-info" role="note"><span class="alert-label">Note:</span> {{ n }}</div>{% endfor %}
+{% include "documents/_perdiem_table.html" %}
+</section>
+
+<div class="button-row">
+  <a class="btn btn-primary" href="{{ url_for('documents.expenses', doc_id=doc.id) }}">Continue to expenses</a>
+  <a class="btn btn-secondary" href="{{ url_for('documents.trip', doc_id=doc.id) }}">Back to trip details</a>
+</div>
+{% endblock %}

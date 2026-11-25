@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %}{% if errors %} (has errors){% endif %} | JTR Travel</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</head>
+<body{% if g.user %} data-timeout="{{ session_timeout }}" data-csrf="{{ csrf_token }}" data-login="{{ url_for('auth.login') }}" data-extend="{{ url_for('auth.extend') }}"{% endif %}>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <div class="proto-banner" role="note">
+    <strong>Prototype.</strong> This is not an official U.S. Government system. Do not enter real personal,
+    financial or Controlled Unclassified Information.
+  </div>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="{{ url_for('main.home') }}">
+        <span class="brand-mark" aria-hidden="true">JTR</span>
+        <span>JTR Travel<span class="brand-sub">{{ org_name }}</span></span>
+      </a>
+      {% if g.user %}
+      <div class="user-menu">
+        <span>Signed in as <strong>{{ g.user.first_name }} {{ g.user.last_name }}</strong></span>
+        <form method="post" action="{{ url_for('auth.logout') }}" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="btn btn-link">Sign out</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+    {% if g.user %}
+    {% set ep = request.endpoint or '' %}
+    <nav aria-label="Primary" class="primary-nav">
+      <ul class="container">
+        <li><a href="{{ url_for('main.home') }}" {% if ep == 'main.home' %}aria-current="page"{% endif %}>Home</a></li>
+        <li><a href="{{ url_for('documents.index') }}" {% if ep.startswith('documents.') and ep != 'documents.queue' %}aria-current="page"{% endif %}>Documents</a></li>
+        <li><a href="{{ url_for('documents.queue') }}" {% if ep == 'documents.queue' %}aria-current="page"{% endif %}>Approvals</a></li>
+        {% if can('reports.view') %}<li><a href="{{ url_for('reports.index') }}" {% if ep.startswith('reports.') %}aria-current="page"{% endif %}>Reports</a></li>{% endif %}
+        <li><a href="{{ url_for('main.profile') }}" {% if ep == 'main.profile' %}aria-current="page"{% endif %}>My profile</a></li>
+        {% if can('admin.users') or can('admin.roles') or can('routing.manage') or can('loa.manage') or can('perdiem.manage') or can('admin.settings') or can('audit.view') or can('org.manage') or can('admin.sod') %}
+        <li><a href="{{ url_for('admin.index') }}" {% if ep.startswith('admin.') %}aria-current="page"{% endif %}>Administration</a></li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+  </header>
+
+  <main id="main-content" tabindex="-1" class="container">
+    {% block breadcrumbs %}{% endblock %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="flashes">
+        {% for cat, msg in messages %}
+        <div class="alert alert-{{ cat }}" role="{{ 'alert' if cat == 'error' else 'status' }}">
+          <span class="alert-label">{{ {'error':'Error','success':'Success','info':'Note'}.get(cat, 'Note') }}:</span> {{ msg }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <ul class="footer-links">
+        <li><a href="{{ url_for('auth.accessibility') }}">Accessibility statement</a></li>
+        <li>Rules engine based on the Joint Travel Regulations (JTR). Rates shown are sample data.</li>
+      </ul>
+    </div>
+  </footer>
+
+  {% if g.user %}
+  <dialog id="timeout-dialog" aria-labelledby="timeout-title" aria-describedby="timeout-desc">
+    <h2 id="timeout-title">Your session is about to end</h2>
+    <p id="timeout-desc">For security, you will be signed out in <span id="timeout-countdown">2 minutes</span>
+      because of inactivity. Unsaved changes will be lost.</p>
+    <div class="button-row">
+      <button type="button" class="btn btn-primary" id="timeout-extend">Stay signed in</button>
+      <button type="button" class="btn btn-secondary" id="timeout-logout">Sign out now</button>
+    </div>
+  </dialog>
+  {% endif %}
+</body>
+</html>

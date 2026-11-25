@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Add user{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(url_for('admin.users'), 'Users'), (None, 'Add user')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Add user</h1>
+{{ m.error_summary(errors) }}
+<form method="post" novalidate>
+  {{ m.csrf() }}
+  {{ m.input('username', 'Username', values.username, errors, required=True, width='md', autocomplete='off', hint='Lowercase letters, numbers, dots, dashes or underscores.', attrs='autocapitalize="none" spellcheck="false"') }}
+  <div class="grid-2">
+    {{ m.input('first_name', 'First name', values.first_name, errors, required=True) }}
+    {{ m.input('last_name', 'Last name', values.last_name, errors, required=True) }}
+  </div>
+  {{ m.input('email', 'Email address', values.email, errors, type='email', required=True) }}
+  {% set opts = [] %}{% for o in orgs %}{% set _ = opts.append((o.id, o.code ~ ' – ' ~ o.name)) %}{% endfor %}
+  {{ m.select('org_id', 'Organization', opts, values.org_id, errors, required=True) }}
+  {{ m.input('password', 'Temporary password', '', errors, type='password', required=True, width='md', autocomplete='new-password', hint='At least 12 characters. Give it to the user through a secure channel.') }}
+  <p>New users receive the <strong>Traveler</strong> role in their organization. You can add more roles next.</p>
+  <button type="submit" class="btn btn-primary">Create user</button>
+</form>
+{% endblock %}

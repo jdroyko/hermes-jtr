@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Separation of duties{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(None, 'Separation of duties')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Separation of duties</h1>
+<p>These rules are checked in addition to permissions. Turning a rule off weakens internal controls. Every change is
+recorded in the audit log.</p>
+<form method="post">
+  {{ m.csrf() }}
+  <fieldset>
+    <legend>Active rules</legend>
+    {% for r in rules %}
+    {{ m.checkbox('enabled', r.name, r.enabled, value=r.key, hint=r.description, id='sod-' ~ r.key) }}
+    {% endfor %}
+  </fieldset>
+  <button type="submit" class="btn btn-primary">Save rules</button>
+</form>
+{% endblock %}

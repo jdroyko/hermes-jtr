@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}{{ 'Edit role: ' ~ role.name if role else 'Create role' }}{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(url_for('admin.roles'), 'Roles'), (None, role.name if role else 'Create role')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>{{ 'Edit role: ' ~ role.name if role else 'Create role' }}</h1>
+{{ m.error_summary(errors) }}
+<form method="post" novalidate>
+  {{ m.csrf() }}
+  {% if role %}
+  <p>Role key: <code>{{ role.key }}</code> (cannot be changed)</p>
+  {% else %}
+  {{ m.input('key', 'Role key', values.key, errors, required=True, width='md', hint='A permanent identifier, such as alt_approving_official.', attrs='autocapitalize="none" spellcheck="false"') }}
+  {% endif %}
+  {{ m.input('name', 'Role name', values.name, errors, required=True) }}
+  {{ m.textarea('description', 'Description', values.description, errors, rows=2) }}
+  {{ m.input('legacy_level', 'DTS permission level equivalent', values.legacy_level, errors, width='md', hint='For reference only, for example Level 2.') }}
+
+  <fieldset class="{% if errors.permissions %}has-error{% endif %}" id="permissions" tabindex="-1" {% if errors.permissions %}aria-describedby="permissions-error"{% endif %}>
+    <legend>Permissions</legend>
+    {% if errors.permissions %}<p class="field-error" id="permissions-error"><span class="sr-only">Error:</span> {{ errors.permissions }}</p>{% endif %}
+    <p class="no-js-hide"><button type="button" class="btn btn-link" data-check-all="perm">Select all</button> <button type="button" class="btn btn-link" data-uncheck-all="perm">Clear all</button></p>
+    {% for cat, perms in groups.items() %}
+    <fieldset class="perm-group">
+      <legend>{{ cat }}</legend>
+      {% for p in perms %}
+      {{ m.checkbox('permissions', p.name ~ ' (' ~ p.key ~ ')', p.key in selected, value=p.key, hint=p.description, id='perm-' ~ p.key|replace('.', '-')) }}
+      {% endfor %}
+    </fieldset>
+    {% endfor %}
+  </fieldset>
+
+  <fieldset>
+    <legend>Roles this role may grant (delegated administration)</legend>
+    <p class="hint">Holders of this role who also have "Assign roles" can grant these roles within their scope, even if
+      they do not hold the permissions themselves. For example, an Organizational DTA can appoint an Approving Official
+      without being able to approve. Leave all unchecked to allow only roles whose permissions the holder already has.</p>
+    {% for r in all_roles if not role or r.id != role.id %}
+    {{ m.checkbox('can_grant', r.name, r.key in grantable, value=r.key, id='grant-' ~ r.key) }}
+    {% endfor %}
+  </fieldset>
+  <button type="submit" class="btn btn-primary">Save role</button>
+</form>
+
+{% if role %}
+<section aria-labelledby="holders-title">
+  <h2 id="holders-title">Users with this role ({{ holders|length }})</h2>
+  {% if holders %}
+  <ul>{% for h in holders %}<li><a href="{{ url_for('admin.user_edit', user_id=h.id) }}">{{ h.last_name }}, {{ h.first_name }}</a> ({{ h.code or 'global' }})</li>{% endfor %}</ul>
+  {% else %}<p>No one has this role.</p>{% endif %}
+</section>
+<section aria-labelledby="delete-title" id="delete" class="card card-warn">
+  <h2 id="delete-title">Delete this role</h2>
+  <form method="post" action="{{ url_for('admin.role_delete', role_id=role.id) }}" data-confirm="Delete the role {{ role.name }}?">
+    {{ m.csrf() }}
+    {% if holders %}{{ m.checkbox('force', 'Also remove this role from the ' ~ holders|length ~ ' user(s) who have it') }}{% endif %}
+    <button type="submit" class="btn btn-danger">Delete role</button>
+  </form>
+</section>
+{% endif %}
+{% endblock %}

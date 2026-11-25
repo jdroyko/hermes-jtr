@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Administration{% endblock %}
+{% block content %}
+<h1>Administration</h1>
+<p>You see only the areas your roles allow.</p>
+<ul class="card-grid">
+  {% for ep, perm, label, desc in areas %}
+  <li class="card"><h2><a href="{{ url_for(ep) }}">{{ label }}</a></h2><p>{{ desc }}</p></li>
+  {% endfor %}
+</ul>
+{% endblock %}

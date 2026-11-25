@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% set errors = assign_errors %}
+{% block title %}User: {{ subject.first_name }} {{ subject.last_name }}{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(url_for('admin.users'), 'Users'), (None, subject.username)] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>{{ subject.first_name }} {{ subject.last_name }}</h1>
+<dl class="summary-list">
+  <div><dt>Username</dt><dd>{{ subject.username }}</dd></div>
+  <div><dt>Organization</dt><dd>{{ org.name }} ({{ org.code }})</dd></div>
+  <div><dt>Email</dt><dd>{{ subject.email }}</dd></div>
+  <div><dt>Account status</dt><dd><span class="tag {{ 'tag-approved' if subject.active else 'tag-cancelled' }}">{{ 'Active' if subject.active else 'Deactivated' }}</span></dd></div>
+</dl>
+<div class="button-row">
+  {% if can('profile.view.org', subject.org_id) %}<a class="btn btn-secondary" href="{{ url_for('admin.user_profile', user_id=subject.id) }}">View or edit profile</a>{% endif %}
+  {% if can_users %}
+  <form method="post" class="inline" data-confirm="{{ 'Deactivate' if subject.active else 'Reactivate' }} this account?">
+    {{ m.csrf() }}<input type="hidden" name="form" value="status">
+    <button type="submit" class="btn {{ 'btn-danger' if subject.active else 'btn-secondary' }}">{{ 'Deactivate account' if subject.active else 'Reactivate account' }}</button>
+  </form>
+  {% endif %}
+</div>
+
+<section aria-labelledby="roles" id="roles-section">
+  <h2 id="roles">Role assignments</h2>
+  {% call m.table_wrap('Role assignments') %}
+  <table class="table">
+    <caption class="sr-only">Roles assigned to {{ subject.username }}</caption>
+    <thead><tr><th scope="col">Role</th><th scope="col">Scope</th><th scope="col">Includes sub-orgs</th><th scope="col">Expires</th><th scope="col">Granted by</th><th scope="col">Revoke</th></tr></thead>
+    <tbody>
+    {% for a in assignments %}
+    {% set expired = a.expires_at and a.expires_at < today %}
+    <tr>
+      <th scope="row">{% if can('admin.roles') %}<a href="{{ url_for('admin.role_edit', role_id=a.role_id) }}">{{ a.role_name }}</a>{% else %}{{ a.role_name }}{% endif %}</th>
+      <td>{{ a.org_code or 'Global (all organizations)' }}</td>
+      <td>{{ 'Yes' if a.include_children else 'No' }}</td>
+      <td>{% if a.expires_at %}{{ a.expires_at|datefmt }}{% if expired %} <span class="tag tag-cancelled">Expired</span>{% endif %}{% else %}Never{% endif %}</td>
+      <td>{{ a.granted_by_name or 'System' }}</td>
+      <td>{% if can('admin.assign', a.org_id) %}
+        <form method="post" class="inline" data-confirm="Revoke {{ a.role_name }}?">
+          {{ m.csrf() }}<input type="hidden" name="form" value="revoke"><input type="hidden" name="assignment_id" value="{{ a.id }}">
+          <button type="submit" class="btn btn-small btn-danger">Revoke<span class="sr-only"> {{ a.role_name }} ({{ a.org_code or 'global' }})</span></button>
+        </form>{% endif %}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="6">No roles assigned. This user cannot do anything.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% endcall %}
+
+  {% if can_assign %}
+  <div class="card">
+    <h3>Grant a role</h3>
+    {{ m.error_summary(assign_errors) }}
+    <form method="post" novalidate>
+      {{ m.csrf() }}<input type="hidden" name="form" value="assign">
+      {% set ropts = [] %}{% for r in roles %}{% set _ = ropts.append((r.id, r.name)) %}{% endfor %}
+      {{ m.select('role_id', 'Role', ropts, av.role_id, assign_errors, required=True) }}
+      {% set sopts = [] %}{% if global_ok %}{% set _ = sopts.append(('GLOBAL', 'Global (all organizations)')) %}{% endif %}
+      {% for o in assign_orgs %}{% set _ = sopts.append((o.id, o.code ~ ' – ' ~ o.name)) %}{% endfor %}
+      {{ m.select('scope_org_id', 'Scope', sopts, av.scope_org_id or subject.org_id, assign_errors, required=True,
+         hint='The organization where this role applies.') }}
+      {{ m.checkbox('include_children', 'Also apply to all sub-organizations', av.include_children) }}
+      {{ m.input('expires_at', 'Expiration date', av.expires_at, assign_errors, type='date', width='md',
+         hint='Leave blank for no expiration. Use for temporary delegations such as an alternate AO.') }}
+      <button type="submit" class="btn btn-primary">Grant role</button>
+    </form>
+  </div>
+  {% endif %}
+</section>
+
+<section aria-labelledby="eff-title">
+  <h2 id="eff-title">Effective permissions</h2>
+  <p>The combined permissions from all active role assignments, regardless of scope.</p>
+  <ul class="columns">{% for p in effective %}<li><code>{{ p }}</code></li>{% else %}<li>None</li>{% endfor %}</ul>
+</section>
+{% endblock %}

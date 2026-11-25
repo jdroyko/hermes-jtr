@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<div class="narrow">
+  <h1>Sign in</h1>
+  {% if timed_out %}
+  <div class="alert alert-info" role="status"><span class="alert-label">Note:</span> You were signed out after a period of inactivity.</div>
+  {% endif %}
+  {{ m.error_summary(errors) }}
+  <form method="post" novalidate>
+    {{ m.csrf() }}
+    {{ m.input('username', 'Username', username, errors, required=True, autocomplete='username', width='md', attrs='autocapitalize="none" spellcheck="false"') }}
+    {{ m.input('password', 'Password', '', errors, type='password', required=True, autocomplete='current-password', width='md') }}
+    <button type="submit" class="btn btn-primary">Sign in</button>
+  </form>
+  <section class="card" aria-labelledby="demo-title">
+    <h2 id="demo-title">Demo accounts</h2>
+    <p>All demo accounts use the password <code>Password123!</code></p>
+    <table class="table">
+      <caption class="sr-only">Demo accounts and their roles</caption>
+      <thead><tr><th scope="col">Username</th><th scope="col">Role</th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><code>traveler</code></th><td>Traveler, 10th Logistics Squadron</td></tr>
+        <tr><th scope="row"><code>preparer</code></th><td>Document preparer / NDEA for 10th Logistics Squadron</td></tr>
+        <tr><th scope="row"><code>budget</code></th><td>Budget DTA, funds verification for 1st Support Wing</td></tr>
+        <tr><th scope="row"><code>ao</code></th><td>Approving Official for 1st Support Wing</td></tr>
+        <tr><th scope="row"><code>co</code></th><td>Certifying Officer for 1st Support Wing</td></tr>
+        <tr><th scope="row"><code>dta</code></th><td>Organizational DTA for 1st Support Wing</td></tr>
+        <tr><th scope="row"><code>auditor</code></th><td>Read-only auditor, whole command</td></tr>
+        <tr><th scope="row"><code>admin</code></th><td>System administrator (all permissions)</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

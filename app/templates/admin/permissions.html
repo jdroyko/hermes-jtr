@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% import "_macros.html" as m with context %}
+{% block title %}Permission catalog{% endblock %}
+{% block breadcrumbs %}{% set crumbs = [(url_for('admin.roles'), 'Roles'), (None, 'Permission catalog')] %}{% include "admin/_crumbs.html" %}{% endblock %}
+{% block content %}
+<h1>Permission catalog</h1>
+<p>System permissions are enforced by the application. Custom permissions do nothing on their own. Use them as the
+required permission on a routing step, for example a "Travel waiver review" step, and add them to roles.</p>
+{% for cat, perms in groups.items() %}
+<section aria-labelledby="cat-{{ loop.index }}">
+<h2 id="cat-{{ loop.index }}">{{ cat }}</h2>
+{% call m.table_wrap(cat ~ ' permissions') %}
+<table class="table table-compact">
+  <caption class="sr-only">{{ cat }} permissions</caption>
+  <thead><tr><th scope="col">Key</th><th scope="col">Name</th><th scope="col">Description</th><th scope="col">Type</th></tr></thead>
+  <tbody>
+  {% for p in perms %}
+  <tr><th scope="row"><code>{{ p.key }}</code></th><td>{{ p.name }}</td><td>{{ p.description }}</td>
+    <td>{% if p.is_system %}System{% else %}Custom
+      <form method="post" class="inline" data-confirm="Delete permission {{ p.key }}? It will be removed from every role.">
+        {{ m.csrf() }}<input type="hidden" name="action" value="delete"><input type="hidden" name="perm_id" value="{{ p.id }}">
+        <button type="submit" class="btn btn-small btn-danger">Delete<span class="sr-only"> {{ p.key }}</span></button></form>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endcall %}
+</section>
+{% endfor %}
+
+<section aria-labelledby="add-perm" class="card">
+<h2 id="add-perm">Add a custom permission</h2>
+{{ m.error_summary(errors) }}
+<form method="post" novalidate>
+  {{ m.csrf() }}<input type="hidden" name="action" value="add">
+  {{ m.input('key', 'Permission key', values.key, errors, required=True, width='md', hint='Dotted lowercase, such as custom.waiver_review.', attrs='autocapitalize="none" spellcheck="false"') }}
+  {{ m.input('name', 'Name', values.name, errors, required=True) }}
+  {{ m.input('category', 'Category', values.category, errors, width='md') }}
+  {{ m.textarea('description', 'Description', values.description, errors, rows=2) }}
+  <button type="submit" class="btn btn-primary">Add permission</button>
+</form>
+</section>
+{% endblock %}
